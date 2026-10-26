@@ -54,6 +54,15 @@ await live.start();
 - `live.endRound()` só funciona em `playing`; `live.save()` aceita até ~60 KB.
 - Pontuação é do streamer (painel > Pontuação), não do game.json: o jogo só mostra com `live.on('points')` e `await live.ranking(5)`, que voltam vazios em dev e local.
 
+## Controle remoto (opcional)
+
+Se o jogo tiver página de controle para o celular do espectador (o streamer liga em Controlar sala e um QR aparece no jogo):
+
+1. `public/game.json`: `"remote": { "page": "controle.html" }` (`"qr": false` se o jogo desenha o QR com `live.remote`).
+2. `controle.html` na raiz + `src/controle.ts` com `createRemote()` (token só no dev, igual ao `createLive`); peça o apelido e chame `remote.join(apelido)`, depois `remote.send('nome', dados)`; `remote.chat(texto)` só para textos que casam com uma regra de comentário.
+3. No jogo: `live.on('remote', ({ name, data, viewer }) => ...)`.
+4. `vite.config.ts`: as duas páginas em `build.rollupOptions.input`. Página mobile, botões grandes, mostre `remote.state.phase` e o aviso de desligado. Detalhes em `docs/EVENTS.md` > Controle remoto.
+
 ## Entregar
 
 `npm run build` sem erros → `npm run deploy -- --notes "o que mudou"` (ou `npm run pack` e enviar o `game.zip` no painel do publisher). O zip leva `game.json` e `demo.json`; sem o demo o envio é recusado.

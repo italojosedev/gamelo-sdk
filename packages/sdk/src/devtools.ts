@@ -75,6 +75,9 @@ export function mountDevtools(live: Live): void {
   add('misc', '➕ seguir', () => live.test.follow({ user: user() }));
   add('misc', '↗ compartilhar', () => live.test.share({ user: user() }));
   add('misc', '👋 entrar', () => live.test.join({ user: user() }));
+  // Controle remoto do game.json: abre a página de controle (no modo dev ela usa o mesmo token).
+  const page = live.manifest?.remote?.page;
+  if (page) add('misc', '📱 controle remoto', async () => void window.open(new URL(page, location.href).href, '_blank'));
   const input = root.querySelector('input')!;
   root.querySelector('form')!.onsubmit = (e) => {
     e.preventDefault();

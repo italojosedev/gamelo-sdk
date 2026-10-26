@@ -2,7 +2,8 @@
 // A explicação completa, com o que cada plataforma manda, está em EVENTS.md.
 
 /** De onde veio o evento. `sim` é o público simulado (desenvolvimento e testes). */
-export type Platform = 'tiktok' | 'twitch' | 'youtube' | 'kick' | 'sim';
+/** web: controle remoto pelo celular do espectador (QR code na tela). */
+export type Platform = 'tiktok' | 'twitch' | 'youtube' | 'kick' | 'web' | 'sim';
 
 /** Quem fez algo na live. */
 export interface Viewer {
@@ -138,6 +139,18 @@ export interface GameManifest {
   interactions?: InteractionRule[];
   settings?: Record<string, unknown>;
   settingsInfo?: Record<string, { label: string; options?: { value: string | number; label: string }[] }>;
+  /**
+   * Controle remoto: a página de controle que o jogo traz no build (o
+   * espectador abre pelo QR code). Sem isto, o jogo não tem controle remoto.
+   */
+  remote?: {
+    /** Página dentro do build, ex.: "controle.html". */
+    page: string;
+    /** O SDK desenha o QR num canto do jogo (padrão). false: o jogo desenha com `live.remote`. */
+    qr?: boolean;
+    /** Texto padrão embaixo do QR (até 30 letras; o streamer pode trocar). */
+    label?: string;
+  };
 }
 
 /** Um evento da linha do tempo do demo.json. */
@@ -192,6 +205,22 @@ export type Mode = 'room' | 'dev' | 'local';
 export type Status = 'connecting' | 'online' | 'offline';
 
 /** O que o SDK sabe da sala agora. */
+/** QR code do controle remoto (o streamer liga em "Controlar sala"); o celular do espectador vira controle. */
+export interface RemoteInfo {
+  /** Página do controle (o que o QR abre). */
+  url: string;
+  /** Imagem SVG do QR. */
+  qr: string;
+  /** Canto escolhido pelo streamer: tl, tr, bl ou br. */
+  corner: 'tl' | 'tr' | 'bl' | 'br';
+  /** Largura em % da tela. */
+  size: number;
+  /** Texto embaixo do QR. */
+  label: string;
+  /** false: o jogo desenha o QR por conta própria (remote.qr do game.json); o SDK não desenha. */
+  draw: boolean;
+}
+
 export interface RoomState {
   mode: Mode;
   status: Status;
@@ -234,6 +263,17 @@ export interface RankingEntry {
 }
 
 /** Eventos de `live.on(...)`. */
+/** Comando que a página de controle remoto mandou (`remote.send(name, data)`). */
+export interface RemoteInput {
+  /** Nome do comando, ex.: "pular". */
+  name: string;
+  /** Dados que a página mandou junto (JSON de até 1 KB), ou null. */
+  data: unknown;
+  platform: 'web';
+  /** Quem tocou: id estável do aparelho (web:...) e o apelido escolhido. */
+  viewer: Viewer;
+}
+
 export interface LiveEvents {
   /** Conectou (ou reconectou, ou a sala reabriu com ajustes novos). */
   ready: RoomState;
@@ -252,6 +292,8 @@ export interface LiveEvents {
   'round.end': RoundEnd;
   /** Um espectador ganhou pontos (só na sala do streamer, com a pontuação ligada no painel). */
   points: PointsUpdate;
+  /** Comando da página de controle remoto (celular de um espectador). */
+  remote: RemoteInput;
   /** Os ajustes mudaram (o streamer salvou no painel). */
   settings: Record<string, unknown>;
   /** Todo GameEvent cru que chega do motor. */

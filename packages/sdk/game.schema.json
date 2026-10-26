@@ -49,6 +49,28 @@
       },
       "additionalProperties": false
     },
+    "remote": {
+      "type": "object",
+      "description": "Controle remoto: página de controle no build que o espectador abre pelo QR code. Sem isto, o jogo não tem controle remoto.",
+      "properties": {
+        "page": {
+          "type": "string",
+          "pattern": "^[\\w][\\w ./-]*\\.html?$",
+          "description": "Página dentro do build, ex.: controle.html."
+        },
+        "qr": {
+          "type": "boolean",
+          "description": "true (padrão): o SDK desenha o QR. false: o jogo desenha com live.remote."
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 30,
+          "description": "Texto padrão embaixo do QR."
+        }
+      },
+      "required": ["page"],
+      "additionalProperties": false
+    },
     "settings": {
       "type": "object",
       "description": "Números e textos ajustáveis pelo streamer no painel."

@@ -2,7 +2,7 @@
 // servidor só aplica o mapa de interações do game.json e repassa tudo como
 // GameEvents. Mesmo protocolo dos jogos do motor, sem código de terceiros aqui.
 import type { AudienceKind } from '@live/core';
-import type { GameManifest, InteractionRule, Phase } from './manifest.ts';
+import type { GameManifest, InteractionRule, Phase, RemoteManifest } from './manifest.ts';
 import { summarize, type GameDefinition } from './runtime.ts';
 
 const KINDS: AudienceKind[] = ['chat', 'gift', 'like', 'follow', 'share', 'join'];
@@ -33,6 +33,7 @@ export function parseManifest(raw: unknown, fallbackId = 'jogo'): GameManifest {
   const interactions = rules.map((r, i) => checkRule(r, i));
   const settings = m.settings ?? {};
   if (typeof settings !== 'object' || Array.isArray(settings)) throw new ManifestError('settings deve ser um objeto');
+  const remote = checkRemote(m.remote);
   const id = typeof m.id === 'string' && /^[\w-]{1,64}$/.test(m.id) ? m.id : fallbackId;
   return {
     ...(m as object),
@@ -47,7 +48,25 @@ export function parseManifest(raw: unknown, fallbackId = 'jogo'): GameManifest {
     },
     interactions,
     settings: settings as Record<string, unknown>,
+    ...(remote ? { remote } : { remote: undefined }),
   } as GameManifest;
+}
+
+/** Caminho de um arquivo do build: relativo, sem "..", sem barra no começo. */
+export function safeBuildPath(path: string): boolean {
+  return /^[\w][\w ./-]*\.html?$/i.test(path) && !path.split('/').includes('..') && path.length <= 200;
+}
+
+function checkRemote(raw: unknown): RemoteManifest | null {
+  if (raw === undefined || raw === null || raw === false) return null;
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new ManifestError('remote deve ser um objeto, ex.: { "page": "controle.html" }');
+  const r = raw as Record<string, unknown>;
+  if (typeof r.page !== 'string' || !safeBuildPath(r.page.replace(/^\.\//, ''))) {
+    throw new ManifestError('remote.page deve ser o caminho de uma página .html do build (ex.: "controle.html")');
+  }
+  if (r.qr !== undefined && typeof r.qr !== 'boolean') throw new ManifestError('remote.qr deve ser true ou false');
+  if (r.label !== undefined && (typeof r.label !== 'string' || r.label.length > 30)) throw new ManifestError('remote.label deve ser um texto de até 30 letras');
+  return { page: r.page.replace(/^\.\//, ''), ...(r.qr !== undefined ? { qr: r.qr } : {}), ...(typeof r.label === 'string' && r.label.trim() ? { label: r.label.trim() } : {}) };
 }
 
 function checkRule(raw: unknown, i: number): InteractionRule {

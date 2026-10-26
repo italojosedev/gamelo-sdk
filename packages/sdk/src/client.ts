@@ -1,3 +1,4 @@
+import { showRemoteQr } from '@live/core';
 import { mountDevtools } from './devtools.ts';
 import { startLocal } from './local.ts';
 import type {
@@ -12,6 +13,8 @@ import type {
   PhaseChange,
   PointsUpdate,
   RankingEntry,
+  RemoteInfo,
+  RemoteInput,
   RoomState,
   RoundEnd,
   Status,
@@ -19,7 +22,7 @@ import type {
 
 /** Mensagens do motor (mesmo protocolo do overlay embutido). */
 export type ServerMessage =
-  | { t: 'hello'; room: string; game: string; info?: { settings: Record<string, unknown>; round: unknown; source: string; saved: unknown } }
+  | { t: 'hello'; room: string; game: string; info?: { settings: Record<string, unknown>; round: unknown; source: string; saved: unknown; remote?: RemoteInfo } }
   | { t: 'snapshot'; state: { now?: number; phase?: string; phaseEndsAt?: number; round?: number }; seq: number }
   | { t: 'events'; events: GameEvent[] };
 
@@ -33,8 +36,15 @@ export interface TestEvent {
   coins?: number;
   count?: number;
   user?: string;
-  platform?: 'tiktok' | 'twitch' | 'youtube' | 'kick';
+  platform?: 'tiktok' | 'twitch' | 'youtube' | 'kick' | 'web';
 }
+
+/** Canal entre a página de controle e o jogo no modo local (abas do mesmo navegador). */
+export const LOCAL_REMOTE_CHANNEL = 'gamelo-remote';
+export type LocalRemoteMessage =
+  | { t: 'hello' }
+  | { t: 'state'; game: string; phase: string }
+  | { t: 'send'; device: string; nick: string; kind: 'input' | 'chat' | 'like' | 'join'; name?: string; data?: unknown; text?: string };
 
 /** Ligação com o motor: WebSocket (sala ou desenvolvimento) ou o motor rodando na própria página. */
 export interface Transport {
@@ -66,6 +76,12 @@ export interface LiveOptions {
   audience?: 'sim' | 'none';
   /** Painel de teste flutuante (padrão: ligado em dev e local, nunca na sala). */
   devtools?: boolean;
+  /**
+   * QR code do controle remoto (o streamer liga em "Controlar sala"): o SDK
+   * mostra num canto da tela. false se o jogo desenha o QR por conta própria
+   * (o link e a imagem vêm em `live.remote`).
+   */
+  remoteQr?: boolean;
 }
 
 type Handler<T> = (payload: T) => void;
@@ -78,6 +94,8 @@ const KINDS: AudienceKind[] = ['chat', 'gift', 'like', 'follow', 'share', 'join'
  */
 export class Live {
   readonly state: RoomState;
+  /** Controle remoto ligado com QR na tela: link da página, imagem do QR, canto e tamanho. null quando desligado. */
+  remote: RemoteInfo | null = null;
   /** Eventos falsos para testar (dev e local). */
   readonly test: {
     chat(text: string, opts?: Omit<TestEvent, 'kind' | 'text'>): Promise<void>;
@@ -174,8 +192,27 @@ export class Live {
       this.transport = startLocal(this.manifestValue!, this.demoValue!, this.opts.audience ?? 'sim');
     }
     await this.transport.start((msg) => this.receive(msg));
+    if (mode === 'local') this.listenLocalRemote();
     if (mode !== 'room' && (this.opts.devtools ?? true) && typeof document !== 'undefined') mountDevtools(this);
     return ready;
+  }
+
+  /**
+   * Modo local: a página de controle aberta em outra aba (createRemote() sem
+   * token) fala com o jogo por BroadcastChannel, sem servidor.
+   */
+  private listenLocalRemote() {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const channel = new BroadcastChannel(LOCAL_REMOTE_CHANNEL);
+    channel.onmessage = (m) => {
+      const msg = m.data as LocalRemoteMessage;
+      if (msg?.t === 'hello') channel.postMessage({ t: 'state', game: this.manifest?.name ?? '', phase: this.state.phase } satisfies LocalRemoteMessage);
+      if (msg?.t !== 'send') return;
+      const viewer = { id: `web:${msg.device}`, handle: msg.nick, nickname: msg.nick };
+      if (msg.kind === 'input') this.play({ seq: 0, at: Date.now(), type: 'remote', payload: { name: msg.name, data: msg.data ?? null, platform: 'web', viewer } });
+      else void this.transport?.test({ kind: msg.kind, text: msg.text, user: msg.nick, platform: 'web' });
+    };
+    this.on('phase', (p) => channel.postMessage({ t: 'state', game: this.manifest?.name ?? '', phase: p.phase } satisfies LocalRemoteMessage));
   }
 
   /** Hora do servidor em ms. Use no lugar de Date.now() para cronômetros e animações. */
@@ -259,6 +296,8 @@ export class Live {
       const changed = JSON.stringify(msg.info?.settings ?? {}) !== JSON.stringify(this.state.settings);
       this.state.game = msg.game;
       if (msg.info) {
+        this.remote = msg.info.remote ?? null;
+        if (this.opts.remoteQr !== false) showRemoteQr(this.remote);
         this.state.settings = msg.info.settings ?? {};
         this.state.source = msg.info.source;
         this.state.saved = msg.info.saved ?? null;
@@ -304,6 +343,9 @@ export class Live {
         break;
       case 'points':
         for (const u of (p?.updates ?? []) as PointsUpdate[]) this.emit('points', u);
+        break;
+      case 'remote':
+        if (typeof p?.name === 'string' && p.viewer) this.emit('remote', { name: p.name, data: p.data ?? null, platform: 'web', viewer: p.viewer } as RemoteInput);
         break;
       case 'audience': {
         const ev = toAudience(p);

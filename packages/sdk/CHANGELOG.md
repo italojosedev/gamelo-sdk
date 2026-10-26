@@ -4,6 +4,10 @@ Todas as mudanças do `@gamelo/sdk`. O formato segue o [Keep a Changelog](https:
 
 ## [Não lançado]
 
+### Adicionado
+
+- Controle remoto por QR code: o jogo declara `remote.page` no `game.json` e leva a própria página de controle no zip; a página usa `createRemote()` (token do jogo no dev, link público do QR na live) e os toques chegam ao jogo como eventos `remote`. Veja a seção do controle remoto no `EVENTS.md`.
+
 ## [0.1.0] - 2026-10-26
 
 Primeira versão pública, separada do repositório da plataforma. Antes se chamava `@live-engine/sdk` (nunca foi publicado no npm).

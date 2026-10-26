@@ -37,3 +37,7 @@ Este projeto é um jogo de live feito com `@gamelo/sdk`. A página roda como fon
 2. Trate a ação com `live.onAction` em `src/main.ts`.
 3. Inclua no `public/demo.json` eventos que exercitem a regra (com o nome de presente que a regra usa), para o preview e a revisão mostrarem a mecânica.
 4. Teste pelo painel de teste e com o público simulado ligado por alguns minutos.
+
+## Controle remoto (opcional)
+
+Só existe se o `game.json` tiver `"remote": { "page": "controle.html" }` e a página estiver no build. A página usa `createRemote()` (token só no dev; na live a chave vem do QR) e manda `remote.send(nome, dados)`, que o jogo recebe em `live.on('remote')`. Nunca ponha o token no build. Contrato em `docs/EVENTS.md` > Controle remoto.

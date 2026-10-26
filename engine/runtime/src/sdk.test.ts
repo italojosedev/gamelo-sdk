@@ -5,6 +5,15 @@ import { GameRuntime, ManifestError, parseManifest, sdkGame } from './index.ts';
 const viewer = { id: 'v1', handle: 'ana', nickname: 'Ana' };
 
 describe('parseManifest', () => {
+  it('remote: página de controle dentro do build', () => {
+    expect(parseManifest({ remote: { page: './controle.html', qr: false, label: 'Jogue' } }).remote).toEqual({ page: 'controle.html', qr: false, label: 'Jogue' });
+    expect(parseManifest({}).remote).toBeUndefined();
+    expect(() => parseManifest({ remote: { page: '../fora.html' } })).toThrow(/remote\.page/);
+    expect(() => parseManifest({ remote: { page: 'https://x.com/a.html' } })).toThrow(/remote\.page/);
+    expect(() => parseManifest({ remote: { page: 'controle.js' } })).toThrow(/remote\.page/);
+    expect(() => parseManifest({ remote: { page: 'c.html', qr: 'sim' } })).toThrow(/remote\.qr/);
+  });
+
   it('preenche os padrões de um game.json mínimo', () => {
     const m = parseManifest({ id: 'corrida', interactions: [{ on: 'chat', keywords: ['1'], action: 'push' }] });
     expect(m).toMatchObject({ id: 'corrida', name: 'corrida', aspect: '9:16', round: { lobbySec: 0, countdownSec: 3, durationSec: 300, resultSec: 5 }, settings: {} });

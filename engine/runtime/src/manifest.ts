@@ -58,11 +58,26 @@ export interface GameManifest {
   settings?: Record<string, unknown>;
   /** Nome e opções de cada ajuste no painel. Ajustes sem entrada aqui aparecem pelo nome da chave. */
   settingsInfo?: Record<string, SettingInfo>;
+  /**
+   * Controle remoto: o jogo traz uma página (no mesmo build) que o espectador
+   * abre no celular pelo QR code e manda comandos para o jogo. Sem isto, o
+   * jogo não tem controle remoto.
+   */
+  remote?: RemoteManifest;
   /** Como o simulador imita a audiência deste jogo (comentários e presentes). */
   simulator?: {
     messages?: string[];
     gifts?: { name: string; coins: number; weight: number }[];
   };
+}
+
+export interface RemoteManifest {
+  /** Página de controle dentro do build (ex.: "controle.html"). */
+  page: string;
+  /** O SDK desenha o QR code num canto do jogo (padrão). false: o jogo desenha com `live.remote`. */
+  qr?: boolean;
+  /** Texto padrão embaixo do QR (o streamer pode trocar). */
+  label?: string;
 }
 
 function giftMatches(rule: InteractionRule, e: { giftName: string; giftId: string }): boolean {
