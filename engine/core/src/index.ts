@@ -1,7 +1,8 @@
 // Contrato central do engine. Tudo que entra vem como AudienceEvent; tudo que
 // sai do runtime para o overlay é GameEvent (o "book ao vivo", como na Stake).
 
-export type Platform = 'tiktok' | 'youtube' | 'twitch' | 'kick' | 'sim';
+// web: controle remoto no celular do espectador (QR code na tela do jogo).
+export type Platform = 'tiktok' | 'youtube' | 'twitch' | 'kick' | 'web' | 'sim';
 
 export interface Viewer {
   /** Id estável na plataforma (não muda se a pessoa trocar o @). */
@@ -92,6 +93,23 @@ export interface RoomInfo {
   source: string;
   /** O último `save` do jogo nesta sala (para continuar depois de recarregar o overlay). */
   saved: unknown;
+  /** Controle remoto ligado com o QR na tela: o overlay mostra o QR neste canto. */
+  remote?: RemoteInfo;
+}
+
+/** QR code do controle remoto que o overlay mostra por cima do jogo. */
+export interface RemoteInfo {
+  /** Página do controle (o que o QR abre). */
+  url: string;
+  /** Imagem SVG do QR. */
+  qr: string;
+  corner: 'tl' | 'tr' | 'bl' | 'br';
+  /** Largura do QR em % da largura da tela. */
+  size: number;
+  /** Texto curto embaixo do QR (ex.: "Jogue pelo celular"). */
+  label: string;
+  /** false: o jogo desenha o QR por conta própria (remote.qr do game.json); o SDK não desenha. */
+  draw: boolean;
 }
 
 /** Mensagens do servidor para o overlay. */
@@ -141,7 +159,7 @@ export interface DemoEvent {
   kind: AudienceKind;
   /** @ de quem fez (um dos `viewers` ou qualquer nome). */
   user?: string;
-  platform?: Exclude<Platform, 'sim'>;
+  platform?: Exclude<Platform, 'sim' | 'web'>;
   /** chat */
   text?: string;
   /** gift: nome do presente, valor de 1 unidade e quantas unidades. */
@@ -171,3 +189,4 @@ export interface DemoScript {
     gifts?: { name: string; coins: number; weight: number }[];
   };
 }
+export { showRemoteQr } from './remote-qr.ts';

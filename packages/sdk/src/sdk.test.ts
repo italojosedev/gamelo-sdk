@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createLive, type Action, type ChatEvent, type GiftEvent, type Live } from './index.ts';
+import { createLive, createRemote, type Action, type ChatEvent, type GiftEvent, type Live, type RemoteInput } from './index.ts';
 
 const manifest = {
   id: 'corrida',
@@ -125,5 +125,25 @@ describe('protocolo do motor', () => {
     live.receive({ t: 'events', events: [{ seq: 1, at: 0, type: 'audience', payload: { id: 'l', kind: 'like', platform: 'tiktok', at: 0, viewer: { id: 'v', handle: 'v', nickname: 'v' }, count: 15 } }] });
     expect(got).toEqual(['15']);
     expect(err).toHaveBeenCalled();
+  });
+});
+
+describe('controle remoto', () => {
+  it('o jogo recebe os comandos da página de controle em live.on("remote") e desenha o QR', () => {
+    live = createLive({ manifest, demo, mode: 'room', room: 'sala' });
+    const inputs: RemoteInput[] = [];
+    live.on('remote', (i) => inputs.push(i));
+    const remote = { url: 'https://site/jogar/abc', qr: 'https://api/remote/abc/qr.svg', corner: 'bl' as const, size: 22, label: 'Jogue', draw: true };
+    live.receive({ t: 'hello', room: 'sala', game: 'corrida', info: { settings: {}, round: {}, source: 'tiktok', saved: null, remote } });
+    expect(live.remote).toEqual(remote);
+    live.receive({ t: 'events', events: [{ seq: 0, at: 1, type: 'remote', payload: { name: 'pular', data: { x: 1 }, platform: 'web', viewer: { id: 'web:a', handle: 'ana', nickname: 'ana' } } }] });
+    expect(inputs).toEqual([{ name: 'pular', data: { x: 1 }, platform: 'web', viewer: { id: 'web:a', handle: 'ana', nickname: 'ana' } }]);
+  });
+
+  it('createRemote escolhe o modo: dev com token, local sem nada, e exige apelido antes de mandar', async () => {
+    expect(createRemote({ token: 'lg_x', engine: 'http://api' }).state.mode).toBe('dev');
+    const r = createRemote();
+    expect(r.state.mode).toBe('local');
+    await expect(r.send('pular')).rejects.toThrow(/join/);
   });
 });

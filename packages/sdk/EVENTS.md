@@ -15,7 +15,7 @@ Todos têm a mesma base:
 | --- | --- | --- |
 | `kind` | `chat` \| `gift` \| `like` \| `follow` \| `share` \| `join` | Tipo do evento. |
 | `id` | string | Único. Duplicados já foram removidos. |
-| `platform` | `tiktok` \| `twitch` \| `youtube` \| `kick` \| `sim` | De onde veio. `sim` = público simulado ou botão de teste. |
+| `platform` | `tiktok` \| `twitch` \| `youtube` \| `kick` \| `web` \| `sim` | De onde veio. `web` = controle remoto pelo celular (QR code). `sim` = público simulado ou botão de teste. |
 | `viewer.id` | string | Id estável da pessoa na plataforma (Twitch `tw:`, YouTube `yt:`, Kick `kk:`). Use como chave de jogador. |
 | `viewer.handle` | string | O @ sem "@". Para mostrar na tela. |
 | `viewer.nickname` | string | Nome de exibição. |
@@ -135,6 +135,35 @@ const top = await live.ranking(5);
 
 Na sala de desenvolvimento e no modo local não há pontuação: teste a tela com dados de mentira. Não peça regras de pontuação no `game.json`; quem decide é o streamer.
 
+## Controle remoto (QR code)
+
+O jogo pode trazer uma **página de controle**, que o espectador abre no celular pelo QR code que aparece no jogo, quando o streamer liga em "Controlar sala". A página é sua, vai no mesmo zip do jogo e só existe se o `game.json` declarar:
+
+```json
+"remote": { "page": "controle.html", "qr": true, "label": "Jogue pelo celular" }
+```
+
+| Campo | O que faz |
+| --- | --- |
+| `page` | Página de controle dentro do build. O envio é recusado se ela não estiver no zip. |
+| `qr` | `true` (padrão): o SDK desenha o QR no canto escolhido pelo streamer. `false`: o jogo desenha com `live.remote` (`qr` = imagem SVG, `url`, `corner`, `size`, `label`). |
+| `label` | Texto padrão embaixo do QR (até 30 letras); o streamer pode trocar. |
+
+Na página de controle, `createRemote()`:
+
+- **dev**: `createRemote({ token, engine })` manda para a sala de desenvolvimento do jogo, com o token do jogo (só no `npm run dev`).
+- **room**: aberta pelo QR, a URL traz `?remote=<chave>&engine=<API>`; a chave é pública e só controla aquela sala (o streamer pode trocar o link). Nunca ponha o token no build.
+- **local**: sem token e sem chave, fala com o jogo aberto em outra aba (modo local), por `BroadcastChannel`.
+
+| Na página | Chega no jogo como |
+| --- | --- |
+| `remote.join(apelido)` | `join` (platform `web`). Obrigatório antes dos outros. |
+| `remote.send(nome, dados)` | `live.on('remote', ({ name, data, viewer }) => …)`; `data` é JSON de até 1 KB; `viewer.id` = `web:<aparelho>`. |
+| `remote.chat(texto)` | Comentário normal (platform `web`): passa pelas regras e pela pontuação. Só aceita texto que casa com uma regra de comentário. |
+| `remote.like()` | Curtida normal (platform `web`). |
+
+`remote.state` traz `game`, `streamer`, `on` (o streamer ligou), `phase` (null com o jogo fechado), `nick` e `error`; `remote.onChange(fn)` avisa quando muda. Limite por aparelho: 1 toque a cada 100 ms e 50 a cada 10 s. Presentes não passam pelo controle.
+
 ## demo.json (obrigatório)
 
 Todo zip de jogo precisa de um `demo.json` na raiz, ao lado do `game.json`. É o público de mentira do jogo: uma linha do tempo de eventos que roda em loop no **preview do build**, na **revisão do admin**, no **modo local** do SDK e na **sala de desenvolvimento**. Os presentes dele também viram os botões de teste do painel. Um zip sem `demo.json` válido é recusado com a mensagem do erro.
@@ -171,7 +200,8 @@ Monte a linha do tempo para mostrar o jogo inteiro em um loop: cada regra do `ga
 
 WebSocket em `<engine>/ws?room=<chave>`. O servidor manda JSON:
 
-- `{ "t": "hello", "room", "game", "info": { "settings", "round", "source", "saved" } }`
+- `{ "t": "hello", "room", "game", "info": { "settings", "round", "source", "saved", "remote" } }` (`remote` só com o controle remoto ligado)
+- `remote` em `events`: comando da página de controle, payload `{ name, data, platform: "web", viewer }`, `seq` 0
 - `{ "t": "snapshot", "state": { "now", "phase", "phaseEndsAt", "round", "seq" }, "seq" }` (a cada mudança e pelo menos 1 vez por segundo)
 - `{ "t": "events", "events": [{ "seq", "at", "type", "payload" }] }` com `type` = `audience`, `action`, `phase`, `round.end`, `points` (payload `{ updates: [{ platform, viewer, added, total }] }`, `seq` 0)
 
