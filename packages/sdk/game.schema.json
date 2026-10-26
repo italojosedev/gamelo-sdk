@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "game.json da Gamelo",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[\\w-]{1,64}$",
+      "description": "Id do jogo (o motor usa o identificador do jogo no painel)."
+    },
+    "name": {
+      "type": "string"
+    },
+    "aspect": {
+      "enum": [
+        "9:16",
+        "16:9"
+      ],
+      "default": "9:16"
+    },
+    "round": {
+      "type": "object",
+      "description": "Tempos da rodada em segundos: lobby → contagem → partida → resultado.",
+      "properties": {
+        "lobbySec": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0
+        },
+        "countdownSec": {
+          "type": "number",
+          "minimum": 0,
+          "default": 3
+        },
+        "durationSec": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2678400,
+          "default": 300
+        },
+        "resultSec": {
+          "type": "number",
+          "minimum": 0,
+          "default": 5
+        }
+      },
+      "additionalProperties": false
+    },
+    "settings": {
+      "type": "object",
+      "description": "Números e textos ajustáveis pelo streamer no painel."
+    },
+    "settingsInfo": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "number"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value",
+                "label"
+              ]
+            }
+          }
+        },
+        "required": [
+          "label"
+        ]
+      }
+    },
+    "interactions": {
+      "type": "array",
+      "description": "Regras que transformam eventos da live em ações do jogo.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "on": {
+            "enum": [
+              "chat",
+              "gift",
+              "like",
+              "follow",
+              "share",
+              "join"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1
+          },
+          "match": {
+            "type": "string",
+            "description": "chat: regex (sem diferenciar maiúsculas)."
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "chat: comentário inteiro igual a uma das palavras."
+          },
+          "gift": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "gift: nome(s) ou id(s) do presente."
+          },
+          "minCoins": {
+            "type": "number",
+            "minimum": 0,
+            "description": "gift: faixa de preço (valor de 1 unidade)."
+          },
+          "phases": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "lobby",
+                "countdown",
+                "playing",
+                "result"
+              ]
+            }
+          },
+          "cooldownMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "params": {
+            "type": "object"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "example": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "on",
+          "action"
+        ]
+      }
+    }
+  }
+}

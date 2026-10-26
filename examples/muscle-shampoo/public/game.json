@@ -1,0 +1,36 @@
+{
+  "$schema": "../node_modules/@gamelo/sdk/game.schema.json",
+  "id": "muscle-shampoo",
+  "name": "Muscle Shampoo",
+  "aspect": "9:16",
+  "round": {
+    "lobbySec": 0,
+    "countdownSec": 0,
+    "durationSec": 2678400,
+    "resultSec": 0
+  },
+  "settings": {
+    "palavras": "shampoo, xampu, lava",
+    "mostrarLogo": 1,
+    "espumaPorShampoo": 14,
+    "espumaCaiPorSegundo": 5,
+    "espumaBravo": 60
+  },
+  "settingsInfo": {
+    "palavras": { "label": "Palavras que liberam o shampoo (separe com vírgula)" },
+    "mostrarLogo": { "label": "Mostrar a logo do jogo", "options": [{ "value": 1, "label": "Sim" }, { "value": 0, "label": "Não" }] },
+    "espumaPorShampoo": { "label": "Espuma por shampoo (0 a 100)" },
+    "espumaCaiPorSegundo": { "label": "Quanto a espuma baixa por segundo" },
+    "espumaBravo": { "label": "Espuma para ele esfregar rápido (0 a 100)" }
+  },
+  "interactions": [
+    {
+      "on": "chat",
+      "match": ".",
+      "action": "comentario",
+      "cooldownMs": 1000,
+      "label": "Comentário com uma das palavras: despeja shampoo (palavras nos ajustes)",
+      "example": "shampoo"
+    }
+  ]
+}

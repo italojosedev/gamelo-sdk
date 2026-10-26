@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "demo.json da Gamelo",
+  "description": "Público de mentira do jogo: a linha do tempo roda em loop no preview, na revisão, no modo local e na sala de desenvolvimento. Obrigatório no zip.",
+  "type": "object",
+  "required": [
+    "events"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "loopSec": {
+      "type": "number",
+      "minimum": 1,
+      "description": "Duração do loop em segundos. Padrão: último evento + 5."
+    },
+    "viewers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "handle"
+        ],
+        "properties": {
+          "handle": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2000,
+      "items": {
+        "type": "object",
+        "required": [
+          "at",
+          "kind"
+        ],
+        "properties": {
+          "at": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Segundos desde o começo do loop."
+          },
+          "kind": {
+            "enum": [
+              "chat",
+              "gift",
+              "like",
+              "follow",
+              "share",
+              "join"
+            ]
+          },
+          "user": {
+            "type": "string",
+            "description": "@ de quem fez. Sem ele, os viewers se revezam."
+          },
+          "platform": {
+            "enum": [
+              "tiktok",
+              "twitch",
+              "youtube",
+              "kick"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "description": "chat: obrigatório."
+          },
+          "gift": {
+            "type": "string",
+            "description": "gift: obrigatório."
+          },
+          "coins": {
+            "type": "number",
+            "minimum": 0,
+            "description": "gift: valor de 1 unidade (obrigatório)."
+          },
+          "count": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "chat"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "text"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "gift"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "gift",
+                "coins"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "random": {
+      "type": "object",
+      "properties": {
+        "chatPerSec": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 50
+        },
+        "likesPerSec": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 50
+        },
+        "giftsPerSec": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 50
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "gifts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "coins",
+              "weight"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "coins": {
+                "type": "number"
+              },
+              "weight": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

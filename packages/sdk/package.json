@@ -1,0 +1,70 @@
+{
+  "name": "@gamelo/sdk",
+  "version": "0.1.0",
+  "description": "SDK para criar jogos interativos de live (TikTok, Twitch, YouTube, Kick) na Gamelo.",
+  "keywords": [
+    "gamelo",
+    "live",
+    "tiktok",
+    "twitch",
+    "youtube",
+    "kick",
+    "overlay",
+    "obs",
+    "jogo"
+  ],
+  "homepage": "https://github.com/italojosedev/gamelo-sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/italojosedev/gamelo-sdk.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": "https://github.com/italojosedev/gamelo-sdk/issues",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./game.schema.json": "./game.schema.json",
+    "./demo.schema.json": "./demo.schema.json"
+  },
+  "bin": {
+    "gamelo": "./bin/gamelo.mjs"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "template",
+    "skill",
+    "README.md",
+    "EVENTS.md",
+    "AGENTS.md",
+    "game.schema.json",
+    "demo.schema.json",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsup",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "@live/core": "workspace:*",
+    "@live/gateway": "workspace:*",
+    "@live/runtime": "workspace:*",
+    "@live/simulator": "workspace:*",
+    "tsup": "^8.5.0",
+    "typescript": "~5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

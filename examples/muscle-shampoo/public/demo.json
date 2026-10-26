@@ -1,0 +1,120 @@
+{
+  "$schema": "../node_modules/@gamelo/sdk/demo.schema.json",
+  "loopSec": 40,
+  "viewers": [
+    {
+      "handle": "ana",
+      "nickname": "Ana"
+    },
+    {
+      "handle": "bia",
+      "nickname": "Bia"
+    },
+    {
+      "handle": "caio",
+      "nickname": "Caio"
+    },
+    {
+      "handle": "duda",
+      "nickname": "Duda"
+    },
+    {
+      "handle": "enzo",
+      "nickname": "Enzo"
+    },
+    {
+      "handle": "fe",
+      "nickname": "Fê"
+    },
+    {
+      "handle": "marombeiro_br",
+      "nickname": "Marombeiro"
+    }
+  ],
+  "events": [
+    {
+      "at": 1,
+      "kind": "chat",
+      "user": "ana",
+      "text": "shampoo"
+    },
+    {
+      "at": 4,
+      "kind": "chat",
+      "user": "bia",
+      "text": "kkkkk"
+    },
+    {
+      "at": 5,
+      "kind": "chat",
+      "user": "caio",
+      "text": "lava esse cabelo"
+    },
+    {
+      "at": 9,
+      "kind": "chat",
+      "user": "duda",
+      "text": "Xampú!!"
+    },
+    {
+      "at": 14,
+      "kind": "chat",
+      "user": "enzo",
+      "text": "que monstro"
+    },
+    {
+      "at": 16,
+      "kind": "chat",
+      "user": "fe",
+      "text": "shampoo"
+    },
+    {
+      "at": 16.5,
+      "kind": "chat",
+      "user": "marombeiro_br",
+      "text": "shampoo"
+    },
+    {
+      "at": 17,
+      "kind": "chat",
+      "user": "ana",
+      "text": "SHAMPOO"
+    },
+    {
+      "at": 17.5,
+      "kind": "chat",
+      "user": "bia",
+      "text": "lava"
+    },
+    {
+      "at": 18,
+      "kind": "chat",
+      "user": "caio",
+      "text": "shampoo"
+    },
+    {
+      "at": 18.5,
+      "kind": "chat",
+      "user": "duda",
+      "text": "mais shampoo"
+    },
+    {
+      "at": 19,
+      "kind": "chat",
+      "user": "enzo",
+      "text": "lava lava"
+    }
+  ],
+  "random": {
+    "chatPerSec": 1.5,
+    "messages": [
+      "shampoo",
+      "lava",
+      "kkkk",
+      "que braço",
+      "xampu",
+      "bora",
+      "shampoo"
+    ]
+  }
+}

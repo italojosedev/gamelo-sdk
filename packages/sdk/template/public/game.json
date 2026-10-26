@@ -1,0 +1,80 @@
+{
+  "$schema": "../node_modules/@gamelo/sdk/game.schema.json",
+  "id": "cabo-de-guerra",
+  "name": "Cabo de guerra",
+  "aspect": "9:16",
+  "round": {
+    "lobbySec": 0,
+    "countdownSec": 3,
+    "durationSec": 90,
+    "resultSec": 6
+  },
+  "settings": {
+    "goal": 100,
+    "chatPull": 1,
+    "coinPull": 2
+  },
+  "settingsInfo": {
+    "goal": {
+      "label": "Força para vencer"
+    },
+    "chatPull": {
+      "label": "Força de cada comentário"
+    },
+    "coinPull": {
+      "label": "Força por moeda de presente"
+    }
+  },
+  "interactions": [
+    {
+      "on": "chat",
+      "keywords": [
+        "1",
+        "azul"
+      ],
+      "action": "pull",
+      "params": {
+        "team": "blue"
+      },
+      "label": "Puxa pelo time azul",
+      "example": "1"
+    },
+    {
+      "on": "chat",
+      "keywords": [
+        "2",
+        "rosa"
+      ],
+      "action": "pull",
+      "params": {
+        "team": "pink"
+      },
+      "label": "Puxa pelo time rosa",
+      "example": "2"
+    },
+    {
+      "on": "gift",
+      "gift": [
+        "Rose",
+        "Rosa"
+      ],
+      "action": "boost",
+      "params": {
+        "label": "Rosa"
+      },
+      "label": "Presente: puxão forte do time de quem mandou"
+    },
+    {
+      "on": "gift",
+      "minCoins": 1,
+      "action": "boost",
+      "label": "Qualquer outro presente: puxão pelo valor"
+    },
+    {
+      "on": "like",
+      "action": "cheer",
+      "cooldownMs": 2000,
+      "label": "Curtidas: torcida"
+    }
+  ]
+}

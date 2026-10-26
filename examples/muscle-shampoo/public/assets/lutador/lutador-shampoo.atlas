@@ -1,0 +1,83 @@
+lutador-shampoo.png
+size: 4096,2048
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+pma: true
+torso-clean
+  rotate: false
+  xy: 2, 2
+  size: 1578, 911
+  orig: 1578, 911
+  offset: 0, 0
+  index: -1
+foam-shoulders
+  rotate: false
+  xy: 1582, 2
+  size: 1513, 843
+  orig: 1513, 843
+  offset: 0, 0
+  index: -1
+legs
+  rotate: false
+  xy: 3097, 2
+  size: 696, 587
+  orig: 696, 587
+  offset: 0, 0
+  index: -1
+head-angry
+  rotate: false
+  xy: 2, 915
+  size: 607, 560
+  orig: 607, 560
+  offset: 0, 0
+  index: -1
+head-calm
+  rotate: false
+  xy: 611, 915
+  size: 607, 560
+  orig: 607, 560
+  offset: 0, 0
+  index: -1
+head-low
+  rotate: false
+  xy: 1220, 915
+  size: 607, 560
+  orig: 607, 560
+  offset: 0, 0
+  index: -1
+forearm-l
+  rotate: false
+  xy: 1829, 915
+  size: 728, 496
+  orig: 728, 496
+  offset: 0, 0
+  index: -1
+forearm-r
+  rotate: false
+  xy: 2559, 915
+  size: 740, 493
+  orig: 740, 493
+  offset: 0, 0
+  index: -1
+crown
+  rotate: false
+  xy: 3301, 915
+  size: 341, 153
+  orig: 341, 153
+  offset: 0, 0
+  index: -1
+bubble
+  rotate: false
+  xy: 3644, 915
+  size: 72, 72
+  orig: 72, 72
+  offset: 0, 0
+  index: -1
+drop
+  rotate: false
+  xy: 3718, 915
+  size: 28, 44
+  orig: 28, 44
+  offset: 0, 0
+  index: -1

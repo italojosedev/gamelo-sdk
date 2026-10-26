@@ -1,0 +1,133 @@
+{
+  "$schema": "../node_modules/@gamelo/sdk/demo.schema.json",
+  "loopSec": 40,
+  "viewers": [
+    {
+      "handle": "ana",
+      "nickname": "Ana"
+    },
+    {
+      "handle": "bia",
+      "nickname": "Bia"
+    },
+    {
+      "handle": "caio",
+      "nickname": "Caio"
+    },
+    {
+      "handle": "duda",
+      "nickname": "Duda"
+    },
+    {
+      "handle": "enzo",
+      "nickname": "Enzo"
+    },
+    {
+      "handle": "fe",
+      "nickname": "Fê"
+    }
+  ],
+  "events": [
+    {
+      "at": 1,
+      "kind": "chat",
+      "user": "ana",
+      "text": "1"
+    },
+    {
+      "at": 2,
+      "kind": "chat",
+      "user": "bia",
+      "text": "2"
+    },
+    {
+      "at": 3,
+      "kind": "chat",
+      "user": "caio",
+      "text": "azul"
+    },
+    {
+      "at": 4,
+      "kind": "chat",
+      "user": "duda",
+      "text": "rosa"
+    },
+    {
+      "at": 6,
+      "kind": "gift",
+      "user": "bia",
+      "gift": "Rose",
+      "coins": 1,
+      "count": 5
+    },
+    {
+      "at": 9,
+      "kind": "like",
+      "user": "enzo",
+      "count": 20
+    },
+    {
+      "at": 12,
+      "kind": "gift",
+      "user": "ana",
+      "gift": "Finger Heart",
+      "coins": 5,
+      "count": 2
+    },
+    {
+      "at": 15,
+      "kind": "follow",
+      "user": "fe"
+    },
+    {
+      "at": 18,
+      "kind": "chat",
+      "user": "enzo",
+      "text": "bora azul"
+    },
+    {
+      "at": 22,
+      "kind": "gift",
+      "user": "duda",
+      "gift": "Doughnut",
+      "coins": 30
+    },
+    {
+      "at": 30,
+      "kind": "gift",
+      "user": "caio",
+      "gift": "Galaxy",
+      "coins": 1000
+    }
+  ],
+  "random": {
+    "chatPerSec": 2,
+    "likesPerSec": 1,
+    "giftsPerSec": 0.2,
+    "messages": [
+      "1",
+      "2",
+      "azul",
+      "rosa",
+      "bora",
+      "kkkk"
+    ],
+    "gifts": [
+      {
+        "name": "Rose",
+        "coins": 1,
+        "weight": 70
+      },
+      {
+        "name": "Finger Heart",
+        "coins": 5,
+        "weight": 20
+      },
+      {
+        "name": "Doughnut",
+        "coins": 30,
+        "weight": 8
+      }
+    ]
+  }
+}

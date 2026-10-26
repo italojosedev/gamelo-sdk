@@ -1,0 +1,24 @@
+/* Overlay transparente 9:16. Topo (~12%) e base (~25%) ficam livres para a interface do TikTok. */
+html, body { margin: 0; height: 100%; background: transparent; font-family: 'Arial Black', system-ui, sans-serif; color: #fff; overflow: hidden; }
+body.preview { background: radial-gradient(circle at 50% 40%, #2b2f45, #12131c 70%); }
+#app { position: relative; width: min(100vw, 56.25vh); height: min(100vh, 177.78vw); margin: 0 auto; }
+#app * { box-sizing: border-box; }
+#app canvas.stage { position: absolute; inset: 0; }
+.hud { position: absolute; top: 12.5%; left: 0; right: 0; text-align: center; text-shadow: 0 2px 0 #000, 0 0 8px #000; pointer-events: none; }
+.hud h1 { margin: 0; font-size: 5vh; line-height: 1; color: #ff5470; -webkit-text-stroke: .3vh #000; paint-order: stroke fill; }
+.hud h1 span { color: #ffd23f; }
+.hud .call { margin: .7vh 4% 0; font: 800 1.9vh system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud .call b { color: #7fe3ff; }
+.top { margin: .6vh 0 0; padding: 0; list-style: none; display: flex; justify-content: center; gap: .8vh; font: 800 1.6vh system-ui, sans-serif; }
+.top li { padding: .2vh .9vh; border-radius: 99px; background: #000a; max-width: 28%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top li span { margin-right: .3vh; } .top li small { color: #7fe3ff; }
+.top li.total { color: #fff; font-size: 1.8vh; }
+
+.meter { position: absolute; left: 5%; top: 36%; height: 34%; width: 3.6vh; border-radius: 99px; background: #0009; border: .35vh solid #fff; overflow: hidden; box-shadow: 0 .4vh 1vh #0008; }
+.meter i { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 99px; background: linear-gradient(0deg, #6ec8ff, #f4fbff); }
+.meter span { position: absolute; left: 0; right: 0; bottom: .5vh; text-align: center; font-size: 2.1vh; }
+
+.floats { position: absolute; inset: 0; pointer-events: none; }
+.floats div { position: absolute; font: 800 2vh system-ui, sans-serif; white-space: nowrap; color: #bff0ff; text-shadow: 0 2px 4px #000; animation: up 1.6s ease-out forwards; }
+@keyframes up { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-8vh); opacity: 0; } }
+.hud h1[hidden] { display: none; }
