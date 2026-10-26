@@ -121,19 +121,31 @@ O motor controla a rodada, igual para todos os overlays: `lobby` → `countdown`
 
 ## Pontuação dos espectadores
 
-O streamer liga a pontuação de cada jogo no painel (**Pontuação**): ele define quanto vale cada coisa (ex.: comentar "fogo" = 1 ponto, uma Rose = 10, sub ou follow = 10). Os pontos ficam guardados por espectador e somam de uma live para outra até o streamer zerar. O jogo não precisa fazer nada para os pontos contarem; ele pode **mostrar** e **usar** os pontos:
+Cada espectador tem pontos por jogo e por streamer, guardados no banco da Gamelo. Eles somam de uma live para outra até o streamer zerar no painel (**Pontuação**), onde ele também vê o ranking. Os pontos chegam de dois jeitos:
+
+- **Regras do streamer**: ele define no painel quanto vale cada coisa (ex.: comentar "fogo" = 1 ponto, uma Rose = 10, sub ou follow = 10). O jogo não precisa fazer nada para esses contarem. Não peça essas regras no `game.json`.
+- **O próprio jogo**: `live.addPoints` dá pontos por um acerto, uma vitória etc. Valem mesmo sem regras ligadas no painel.
 
 | | |
 | --- | --- |
-| `points` | Alguém ganhou pontos agora: `{ platform, viewer, added, total }` (`total` = acumulado no jogo). Só na sala do streamer. |
-| `live.ranking(limit = 10)` | Ranking da sala, do maior para o menor (até 100): `[{ rank, platform, viewer, points }]`. Em dev e local volta vazio. |
+| `points` | Alguém ganhou pontos agora (pelas regras ou pelo `addPoints`): `{ platform, viewer, added, total }` (`total` = acumulado no jogo). |
+| `live.addPoints(quem, pontos, id?)` | Dá pontos (inteiro de 1 a 100 000) a quem mandou um evento. `quem` é o evento da live, a ação (`onAction`) ou o comando do controle remoto. Só vale para quem já passou pela sala. O mesmo `id` conta uma vez (padrão: o `id` do evento), então dois overlays abertos não somam em dobro; passe um `id` seu para dar mais de um prêmio pelo mesmo evento. |
+| `live.viewerPoints(quem)` | Pontos guardados de um espectador neste jogo e a posição dele: `{ platform, viewer, points, rank }`. Sem pontos ainda: `points` 0 e `rank` null. Serve para responder um "!pontos" no chat. |
+| `live.ranking(limit = 10)` | Ranking do jogo, do maior para o menor (até 100): `[{ rank, platform, viewer, points }]`. |
 
 ```ts
+live.onAction('palavra', (a) => {
+  if (acertou(a.event.text)) live.addPoints(a, 60);
+});
+live.onAction('pontos', async (a) => {
+  const { points, rank } = await live.viewerPoints(a);
+  mostrar(`@${a.viewer.handle}: ${points} pontos${rank ? ` (#${rank})` : ''}`);
+});
 live.on('points', ({ viewer, added, total }) => showToast(`@${viewer.handle} +${added} (${total})`));
 const top = await live.ranking(5);
 ```
 
-Na sala de desenvolvimento e no modo local não há pontuação: teste a tela com dados de mentira. Não peça regras de pontuação no `game.json`; quem decide é o streamer.
+Na sala do streamer tudo vai para o banco. Na sala de desenvolvimento e no modo local os pontos ficam só na memória da página (`addPoints`, `viewerPoints` e `ranking` funcionam igual, para testar a tela) e as regras do streamer não existem.
 
 ## Controle remoto (QR code)
 
@@ -205,4 +217,4 @@ WebSocket em `<engine>/ws?room=<chave>`. O servidor manda JSON:
 - `{ "t": "snapshot", "state": { "now", "phase", "phaseEndsAt", "round", "seq" }, "seq" }` (a cada mudança e pelo menos 1 vez por segundo)
 - `{ "t": "events", "events": [{ "seq", "at", "type", "payload" }] }` com `type` = `audience`, `action`, `phase`, `round.end`, `points` (payload `{ updates: [{ platform, viewer, added, total }] }`, `seq` 0)
 
-O jogo pode mandar `{ "t": "end", "result": { "winner" } }` e `{ "t": "save", "data": … }`. O ranking da sala está em `GET <engine>/sdk/rooms/<chave>/points?limit=10`.
+O jogo pode mandar `{ "t": "end", "result": { "winner" } }`, `{ "t": "save", "data": … }` e `{ "t": "points", "add": [{ "platform", "viewerId", "points", "id" }] }` (até 50 por mensagem). O ranking da sala está em `GET <engine>/sdk/rooms/<chave>/points?limit=10` e os pontos de um espectador em `GET <engine>/sdk/rooms/<chave>/points/viewer?platform=<plataforma>&id=<viewer.id>`.

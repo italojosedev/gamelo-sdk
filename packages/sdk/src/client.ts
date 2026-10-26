@@ -11,6 +11,7 @@ import type {
   LiveEvents,
   Mode,
   PhaseChange,
+  PointsTarget,
   PointsUpdate,
   RankingEntry,
   RemoteInfo,
@@ -18,6 +19,8 @@ import type {
   RoomState,
   RoundEnd,
   Status,
+  Viewer,
+  ViewerPoints,
 } from './types.ts';
 
 /** Mensagens do motor (mesmo protocolo do overlay embutido). */
@@ -26,7 +29,13 @@ export type ServerMessage =
   | { t: 'snapshot'; state: { now?: number; phase?: string; phaseEndsAt?: number; round?: number }; seq: number }
   | { t: 'events'; events: GameEvent[] };
 
-export type ClientMessage = { t: 'end'; result?: { winner?: string; summary?: unknown } } | { t: 'save'; data: unknown };
+export type ClientMessage =
+  | { t: 'end'; result?: { winner?: string; summary?: unknown } }
+  | { t: 'save'; data: unknown }
+  | { t: 'points'; add: { platform: string; viewerId: string; points: number; id?: string }[] };
+
+/** Teto dos pontos de uma vez (o motor recusa acima disso). */
+const MAX_AWARD = 100_000;
 
 /** Evento falso para testar (botões de teste, `live.test.*`). */
 export interface TestEvent {
@@ -113,6 +122,9 @@ export class Live {
   private manifestValue: GameManifest | null;
   private demoValue: DemoScript | null;
   private readonly params: URLSearchParams;
+  /** dev e local: pontos só na memória da página (a sala de verdade grava no banco). */
+  private readonly memoryPoints = new Map<string, { platform: string; viewer: Viewer; points: number }>();
+  private readonly memoryAwarded = new Set<string>();
 
   constructor(private readonly opts: LiveOptions = {}) {
     this.params = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
@@ -248,17 +260,84 @@ export class Live {
 
   /**
    * Ranking de pontos dos espectadores nesta sala, do maior para o menor
-   * (até 100). Só a sala do streamer tem pontuação; em dev e local volta vazio.
-   * Para atualizar ao vivo, ouça `live.on('points', ...)`.
+   * (até 100). Na sala do streamer vem do banco; em dev e local, dos pontos
+   * dados com `addPoints` nesta página. Para atualizar ao vivo, ouça `live.on('points', ...)`.
    */
   async ranking(limit = 10): Promise<RankingEntry[]> {
-    if (this.state.mode !== 'room' || !this.state.room) return [];
-    const engine = this.opts.engine ?? this.params.get('engine') ?? location.origin;
-    const url = new URL(`/sdk/rooms/${encodeURIComponent(this.state.room)}/points`, engine);
-    url.searchParams.set('limit', String(Math.min(Math.max(1, Math.floor(limit)), 100)));
+    const max = Math.min(Math.max(1, Math.floor(limit)), 100);
+    if (this.state.mode !== 'room') return this.memoryRanking().slice(0, max);
+    if (!this.state.room) return [];
+    const url = this.engineUrl(`/sdk/rooms/${encodeURIComponent(this.state.room)}/points`);
+    url.searchParams.set('limit', String(max));
     const res = await fetch(url);
     if (!res.ok) throw new Error(`[gamelo] ranking: erro ${res.status}`);
     return ((await res.json()) as { ranking: RankingEntry[] }).ranking;
+  }
+
+  /**
+   * Dá pontos a um espectador (um acerto, uma vitória). Na sala do streamer
+   * eles vão para a pontuação do jogo no banco e somam entre lives, como os
+   * das regras do streamer; chega um evento `points` com o total. Inteiro de 1
+   * a 100 mil, só para quem já mandou algo na sala. Passe o evento, a ação ou o
+   * comando remoto de quem ganhou; o `id` do evento (ou o `id` que você passar)
+   * conta uma vez só, mesmo com dois overlays abertos.
+   */
+  addPoints(who: PointsTarget, points: number, id?: string): void {
+    const t = target(who);
+    const n = Math.floor(Number(points));
+    if (!t || !(n >= 1 && n <= MAX_AWARD)) {
+      console.warn('[gamelo] addPoints: precisa de quem ganhou (evento, ação ou remote) e de 1 a 100000 pontos');
+      return;
+    }
+    const awardId = id ?? t.id;
+    if (this.state.mode === 'room') {
+      this.transport?.send({ t: 'points', add: [{ platform: t.platform, viewerId: t.viewer.id, points: n, ...(awardId ? { id: String(awardId) } : {}) }] });
+      return;
+    }
+    const key = `${t.platform}:${t.viewer.id}`;
+    if (awardId) {
+      if (this.memoryAwarded.has(`${key}:${awardId}`)) return;
+      this.memoryAwarded.add(`${key}:${awardId}`);
+    }
+    const row = this.memoryPoints.get(key) ?? { platform: t.platform, viewer: t.viewer, points: 0 };
+    row.points += n;
+    row.viewer = t.viewer;
+    this.memoryPoints.set(key, row);
+    // Igual à sala: o aviso chega depois, não dentro de quem chamou.
+    const update: PointsUpdate = { platform: t.platform as PointsUpdate['platform'], viewer: t.viewer, added: n, total: row.points };
+    setTimeout(() => this.emit('points', update), 0);
+  }
+
+  /**
+   * Pontos guardados de um espectador neste jogo e a posição dele no ranking,
+   * por exemplo para responder um "!pontos" no chat. Na sala do streamer vem
+   * do banco (inclui os pontos das regras do streamer e de lives passadas).
+   */
+  async viewerPoints(who: PointsTarget): Promise<ViewerPoints> {
+    const t = target(who);
+    if (!t) throw new Error('[gamelo] viewerPoints: passe o evento, a ação ou o comando remoto do espectador');
+    if (this.state.mode !== 'room') {
+      const row = this.memoryPoints.get(`${t.platform}:${t.viewer.id}`);
+      if (!row) return { platform: t.platform, viewer: { id: t.viewer.id }, points: 0, rank: null };
+      const rank = this.memoryRanking().findIndex((r) => r.platform === row.platform && r.viewer.id === row.viewer.id) + 1;
+      return { platform: row.platform, viewer: row.viewer, points: row.points, rank };
+    }
+    const url = this.engineUrl(`/sdk/rooms/${encodeURIComponent(this.state.room)}/points/viewer`);
+    url.searchParams.set('platform', t.platform);
+    url.searchParams.set('id', t.viewer.id);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`[gamelo] viewerPoints: erro ${res.status}`);
+    return (await res.json()) as ViewerPoints;
+  }
+
+  private memoryRanking(): RankingEntry[] {
+    return [...this.memoryPoints.values()]
+      .sort((a, b) => b.points - a.points)
+      .map((r, i) => ({ rank: i + 1, platform: r.platform as RankingEntry['platform'], viewer: r.viewer, points: r.points }));
+  }
+
+  private engineUrl(path: string): URL {
+    return new URL(path, this.opts.engine ?? this.params.get('engine') ?? location.origin);
   }
 
   /** Desconecta. */
@@ -377,6 +456,13 @@ export class Live {
     this.offset = this.synced ? Math.max(sample, this.offset * 0.9 + sample * 0.1) : sample;
     this.synced = true;
   }
+}
+
+/** Plataforma, espectador e id de quem ganha ou consulta pontos (a ação usa o evento dela). */
+function target(who: PointsTarget | null | undefined): { platform: string; viewer: Viewer; id?: string } | null {
+  const t = who && 'event' in who && who.event ? who.event : (who as { platform: string; viewer: Viewer; id?: string } | null | undefined);
+  if (!t || typeof t.platform !== 'string' || !t.viewer?.id) return null;
+  return t;
 }
 
 /** Evento "audience" do motor → evento do SDK. */

@@ -38,6 +38,10 @@ Este projeto é um jogo de live feito com `@gamelo/sdk`. A página roda como fon
 3. Inclua no `public/demo.json` eventos que exercitem a regra (com o nome de presente que a regra usa), para o preview e a revisão mostrarem a mecânica.
 4. Teste pelo painel de teste e com o público simulado ligado por alguns minutos.
 
+## Pontos dos espectadores
+
+Os pontos de cada espectador ficam no banco da Gamelo, por jogo e streamer, e somam entre lives. O streamer define as regras dele no painel (não vão no `game.json`); o jogo dá os pontos dele com `live.addPoints(acaoOuEvento, n)` (acerto, vitória) e lê os de alguém com `await live.viewerPoints(acaoOuEvento)` (ex.: comando "!pontos"). `live.on('points')` avisa quando alguém pontua e `live.ranking(n)` traz o ranking. Em dev e local tudo isso fica na memória da página. Detalhes em `docs/EVENTS.md` > Pontuação.
+
 ## Controle remoto (opcional)
 
 Só existe se o `game.json` tiver `"remote": { "page": "controle.html" }` e a página estiver no build. A página usa `createRemote()` (token só no dev; na live a chave vem do QR) e manda `remote.send(nome, dados)`, que o jogo recebe em `live.on('remote')`. Nunca ponha o token no build. Contrato em `docs/EVENTS.md` > Controle remoto.

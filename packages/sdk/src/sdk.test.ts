@@ -99,7 +99,7 @@ describe('protocolo do motor', () => {
     expect(seen).toEqual(['ready', 'settings:{"a":2}', 'ready']);
   });
 
-  it('pontos da sala viram o evento points; ranking só na sala', async () => {
+  it('pontos da sala viram o evento points; sem addPoints o ranking local fica vazio', async () => {
     live = createLive({ mode: 'local', manifest, demo });
     const got: unknown[] = [];
     live.on('points', (p) => got.push(p));
@@ -107,6 +107,45 @@ describe('protocolo do motor', () => {
     live.receive({ t: 'events', events: [{ seq: 0, at: 0, type: 'points', payload: { updates: [{ platform: 'tiktok', viewer, added: 10, total: 25 }] } }] });
     expect(got).toEqual([{ platform: 'tiktok', viewer, added: 10, total: 25 }]);
     expect(await live.ranking()).toEqual([]);
+  });
+
+  it('addPoints e viewerPoints no modo local: memória da página, cada id uma vez', async () => {
+    vi.useFakeTimers();
+    live = createLive({ mode: 'local', manifest, demo });
+    const got: unknown[] = [];
+    live.on('points', (p) => got.push(p));
+    const ana = { id: 'test:ana', handle: 'ana', nickname: 'ana' };
+    const chat: ChatEvent = { kind: 'chat', id: 'e1', platform: 'sim', viewer: ana, at: 0, text: 'porta' };
+    const action: Action = { name: 'palavra', params: {}, viewer: ana, amount: 1, coins: 0, event: chat };
+    live.addPoints(chat, 60);
+    live.addPoints(action, 60); // mesmo evento: não soma de novo
+    live.addPoints(action, 30, 'bonus');
+    live.addPoints({ platform: 'web', viewer: { id: 'web:1', handle: 'bia', nickname: 'bia' } }, 100);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    live.addPoints(chat, 0);
+    expect(warn).toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(got).toEqual([
+      { platform: 'sim', viewer: ana, added: 60, total: 60 },
+      { platform: 'sim', viewer: ana, added: 30, total: 90 },
+      { platform: 'web', viewer: { id: 'web:1', handle: 'bia', nickname: 'bia' }, added: 100, total: 100 },
+    ]);
+    expect(await live.viewerPoints(action)).toEqual({ platform: 'sim', viewer: ana, points: 90, rank: 2 });
+    expect(await live.viewerPoints({ platform: 'sim', viewer: { id: 'x', handle: 'x', nickname: 'x' } })).toEqual({ platform: 'sim', viewer: { id: 'x' }, points: 0, rank: null });
+    expect((await live.ranking(1)).map((r) => r.viewer.handle)).toEqual(['bia']);
+  });
+
+  it('na sala, addPoints vai pelo WebSocket e viewerPoints lê da API', async () => {
+    live = createLive({ mode: 'room', room: 'sala-123', engine: 'https://api.gamelo.test' });
+    const sent: unknown[] = [];
+    (live as any).transport = { send: (m: unknown) => sent.push(m), close() {} };
+    const viewer = { id: 'tw:9', handle: 'ana', nickname: 'Ana' };
+    live.addPoints({ id: 'ev-1', platform: 'twitch', viewer }, 40);
+    expect(sent).toEqual([{ t: 'points', add: [{ platform: 'twitch', viewerId: 'tw:9', points: 40, id: 'ev-1' }] }]);
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ platform: 'twitch', viewer, points: 340, rank: 3 })));
+    expect(await live.viewerPoints({ platform: 'twitch', viewer })).toMatchObject({ points: 340, rank: 3 });
+    expect(String(fetch.mock.calls[0]![0])).toBe('https://api.gamelo.test/sdk/rooms/sala-123/points/viewer?platform=twitch&id=tw%3A9');
+    fetch.mockRestore();
   });
 
   it('eventos de teste não valem na sala do streamer', async () => {

@@ -262,6 +262,23 @@ export interface RankingEntry {
   points: number;
 }
 
+/**
+ * Quem ganha ou consulta pontos: um evento da live, uma ação (usa o evento
+ * dela) ou um comando do controle remoto. `id` (o do evento) evita somar o
+ * mesmo acerto duas vezes.
+ */
+export type PointsTarget = { platform: Platform | string; viewer: Viewer; id?: string } | Action;
+
+/** Pontos guardados de um espectador neste jogo (`live.viewerPoints`). */
+export interface ViewerPoints {
+  platform: string;
+  /** Sem pontos ainda, vem só com o `id`. */
+  viewer: Viewer | { id: string };
+  points: number;
+  /** Posição no ranking do jogo; null se ainda não pontuou. */
+  rank: number | null;
+}
+
 /** Eventos de `live.on(...)`. */
 /** Comando que a página de controle remoto mandou (`remote.send(name, data)`). */
 export interface RemoteInput {

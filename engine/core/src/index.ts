@@ -119,12 +119,26 @@ export type ServerMessage =
   | { t: 'events'; events: GameEvent[] };
 
 /**
+ * Pontos que o jogo dá a um espectador (acerto, vitória...). O servidor só
+ * aceita espectadores que já passaram pela sala e grava na pontuação do
+ * streamer. `id` evita somar duas vezes o mesmo acerto (dois overlays abertos).
+ */
+export interface PointsAward {
+  platform: string;
+  viewerId: string;
+  points: number;
+  id?: string;
+}
+
+/**
  * Mensagens do overlay para o servidor. Só jogos do SDK (lógica no navegador)
- * usam: encerrar a rodada e guardar um estado pequeno para recarregar.
+ * usam: encerrar a rodada, guardar um estado pequeno para recarregar e dar
+ * pontos aos espectadores.
  */
 export type ClientMessage =
   | { t: 'end'; result?: { winner?: string; summary?: unknown } }
-  | { t: 'save'; data: unknown };
+  | { t: 'save'; data: unknown }
+  | { t: 'points'; add: PointsAward[] };
 
 /** Fonte de eventos da audiência (TikTok, simulador, ...). */
 export interface AudienceSource {
