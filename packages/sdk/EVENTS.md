@@ -1,6 +1,8 @@
 # Contrato de eventos da live
 
-Tudo que um jogo do `@gamelo/sdk` recebe. O motor conecta na live, remove duplicados, junta combos de presente, aplica as regras do `game.json` e entrega para o jogo pelo WebSocket da sala. O jogo nunca fala direto com o TikTok, a Twitch, o YouTube ou a Kick.
+Tudo que um jogo do `@gamelo/sdk` recebe. O motor da Gamelo (no servidor) conecta na live, remove duplicados, junta combos de presente, aplica as regras do `game.json` e entrega para o jogo pelo WebSocket da sala. O jogo nunca fala direto com o TikTok, a Twitch, o YouTube ou a Kick.
+
+O jogo sempre roda numa sala no servidor: a **sala do streamer** na live (e a de prévia, na prévia do build e na demonstração da loja), aberta pelo link com `?room=`, ou a **sala de teste** no desenvolvimento, aberta com o **token de teste** do jogo (`lgt_...`) e o `game.json` e o `demo.json` locais. Os eventos e o protocolo são os mesmos nas duas.
 
 ```
 live (TikTok/Twitch/YouTube/Kick) ─► conector ─► gateway ─► regras do game.json ─► WebSocket ─► seu jogo (navegador/OBS)
@@ -145,7 +147,7 @@ live.on('points', ({ viewer, added, total }) => showToast(`@${viewer.handle} +${
 const top = await live.ranking(5);
 ```
 
-Na sala do streamer tudo vai para o banco. Na sala de desenvolvimento e no modo local os pontos ficam só na memória da página (`addPoints`, `viewerPoints` e `ranking` funcionam igual, para testar a tela) e as regras do streamer não existem.
+Na sala do streamer tudo vai para o banco. Na sala de teste (e na de prévia de um build) os pontos ficam só na memória da API, somem quando ela reinicia (`addPoints`, `viewerPoints` e `ranking` funcionam igual, para testar a tela) e as regras do streamer não existem.
 
 ## Controle remoto (QR code)
 
@@ -163,9 +165,8 @@ O jogo pode trazer uma **página de controle**, que o espectador abre no celular
 
 Na página de controle, `createRemote()`:
 
-- **dev**: `createRemote({ token, engine })` manda para a sala de desenvolvimento do jogo, com o token do jogo (só no `npm run dev`).
-- **room**: aberta pelo QR, a URL traz `?remote=<chave>&engine=<API>`; a chave é pública e só controla aquela sala (o streamer pode trocar o link). Nunca ponha o token no build.
-- **local**: sem token e sem chave, fala com o jogo aberto em outra aba (modo local), por `BroadcastChannel`.
+- **test**: `createRemote({ token })` manda para a sala de teste do jogo, com o token de teste (só no `npm run dev`).
+- **room**: aberta pelo QR, a URL traz `?remote=<chave>&engine=<API>`; a chave é pública e só controla aquela sala (o streamer pode trocar o link). Nunca ponha token no build.
 
 | Na página | Chega no jogo como |
 | --- | --- |
@@ -178,7 +179,7 @@ Na página de controle, `createRemote()`:
 
 ## demo.json (obrigatório)
 
-Todo zip de jogo precisa de um `demo.json` na raiz, ao lado do `game.json`. É o público de mentira do jogo: uma linha do tempo de eventos que roda em loop no **preview do build**, na **revisão do admin**, no **modo local** do SDK e na **sala de desenvolvimento**. Os presentes dele também viram os botões de teste do painel. Um zip sem `demo.json` válido é recusado com a mensagem do erro.
+Todo zip de jogo precisa de um `demo.json` na raiz, ao lado do `game.json`. É o público de mentira do jogo: uma linha do tempo de eventos que roda em loop na **prévia do build**, na **demonstração da loja**, na **revisão do admin** e na **sala de teste**. Os presentes dele também viram os botões de teste do painel. Um zip sem `demo.json` válido é recusado com a mensagem do erro.
 
 ```json
 {
@@ -218,3 +219,16 @@ WebSocket em `<engine>/ws?room=<chave>`. O servidor manda JSON:
 - `{ "t": "events", "events": [{ "seq", "at", "type", "payload" }] }` com `type` = `audience`, `action`, `phase`, `round.end`, `points` (payload `{ updates: [{ platform, viewer, added, total }] }`, `seq` 0)
 
 O jogo pode mandar `{ "t": "end", "result": { "winner" } }`, `{ "t": "save", "data": … }` e `{ "t": "points", "add": [{ "platform", "viewerId", "points", "id" }] }` (até 50 por mensagem). O ranking da sala está em `GET <engine>/sdk/rooms/<chave>/points?limit=10` e os pontos de um espectador em `GET <engine>/sdk/rooms/<chave>/points/viewer?platform=<plataforma>&id=<viewer.id>`.
+
+### API com token (o `createApi` faz por você)
+
+`<engine>` é `https://api.gamelo.com.br`. Mande `Authorization: Bearer <token>`. Token do tipo errado volta 403 com a mensagem do que usar.
+
+| Rota | Token | O que faz |
+| --- | --- | --- |
+| `GET /sdk/game` | qualquer um | `{ slug, name, status, currentVersion, token: "test" \| "publish", engine }` |
+| `POST /sdk/dev-rooms` | teste | Corpo `{ manifest, demo, audience: "sim" \| "none" }`. Abre (ou reabre) a sala de teste do jogo: `{ room, engine, game }`. Conecte em `/ws?room=<room>`. |
+| `POST /sdk/dev-rooms/<room>/test` | teste | Evento falso: `{ kind, text?, gift?, coins?, count?, user?, platform? }`. |
+| `GET` / `POST /sdk/dev-room/remote` | teste | Fase da sala de teste / toque da página de controle no teste (corpo igual ao `POST /remote/<chave>/send`). |
+| `POST /sdk/builds` | publicação | `multipart/form-data` com `bundle` (o zip) e `notes`: envia uma versão. |
+| `GET /sdk/builds` | publicação | Versões enviadas: `[{ id, version, status, notes, reviewNotes, previewUrl, current, createdAt }]`. |

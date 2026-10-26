@@ -1,6 +1,6 @@
 {
   "name": "@gamelo/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SDK para criar jogos interativos de live (TikTok, Twitch, YouTube, Kick) na Gamelo.",
   "keywords": [
     "gamelo",
@@ -29,6 +29,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./api": {
+      "types": "./dist/api.d.ts",
+      "import": "./dist/api.js"
+    },
     "./game.schema.json": "./game.schema.json",
     "./demo.schema.json": "./demo.schema.json"
   },
@@ -55,10 +59,6 @@
     "fflate": "^0.8.3"
   },
   "devDependencies": {
-    "@live/core": "workspace:*",
-    "@live/gateway": "workspace:*",
-    "@live/runtime": "workspace:*",
-    "@live/simulator": "workspace:*",
     "tsup": "^8.5.0",
     "typescript": "~5.9.0",
     "vitest": "^3.2.0"

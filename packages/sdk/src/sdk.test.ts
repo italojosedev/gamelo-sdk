@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createLive, createRemote, type Action, type ChatEvent, type GiftEvent, type Live, type RemoteInput } from './index.ts';
+import { createApi, createLive, createRemote, type Action, type Live, type RemoteInput } from './index.ts';
 
 const manifest = {
   id: 'corrida',
@@ -20,69 +20,125 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('modo local', () => {
-  it('liga sem servidor, aplica as regras do game.json e entrega eventos e ações', async () => {
-    vi.useFakeTimers();
-    live = createLive({ manifest, demo, audience: 'none' });
-    expect(live.state.mode).toBe('local');
-    const chats: ChatEvent[] = [];
-    const gifts: GiftEvent[] = [];
-    const pushes: Action[] = [];
-    const boosts: Action[] = [];
-    live.on('chat', (e) => chats.push(e));
-    live.on('gift', (e) => gifts.push(e));
-    live.onAction('push', (a) => pushes.push(a));
-    live.onAction('boost', (a) => boosts.push(a));
-    const ready = await live.start();
-    expect(ready).toMatchObject({ mode: 'local', game: 'corrida', settings: { meta: 100 }, source: 'nenhuma' });
+/** WebSocket de mentira: guarda o que o jogo mandou e deixa o teste responder como a sala. */
+class FakeSocket {
+  static last: FakeSocket | null = null;
+  static OPEN = 1;
+  readyState = 1;
+  sent: unknown[] = [];
+  onmessage: ((m: { data: string }) => void) | null = null;
+  onclose: ((e: { code: number }) => void) | null = null;
+  constructor(readonly url: string) {
+    FakeSocket.last = this;
+  }
+  send(data: string) {
+    this.sent.push(JSON.parse(data));
+  }
+  close() {}
+  serve(msg: unknown) {
+    this.onmessage?.({ data: JSON.stringify(msg) });
+  }
+}
 
-    await vi.advanceTimersByTimeAsync(200);
-    expect(live.state.phase).toBe('playing');
-    await live.test.chat('1', { user: 'ana' });
-    await live.test.gift('Rose', { coins: 1, count: 5, user: 'bia' });
-    await vi.advanceTimersByTimeAsync(200);
+/** fetch de mentira: responde pela rota e guarda as chamadas. */
+function fakeFetch(routes: Record<string, unknown>) {
+  const calls: { method: string; url: string; auth: string | null; body: unknown }[] = [];
+  const fn = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    const headers = new Headers(init?.headers);
+    const body = typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body;
+    calls.push({ method, url, auth: headers.get('authorization'), body });
+    const key = Object.keys(routes).find((k) => `${method} ${url}`.startsWith(k));
+    if (!key) return new Response(JSON.stringify({ message: 'Token do jogo inválido.' }), { status: 401 });
+    return new Response(JSON.stringify(routes[key]), { status: 200 });
+  });
+  return { calls, restore: () => fn.mockRestore() };
+}
 
-    expect(chats[0]).toMatchObject({ kind: 'chat', text: '1', viewer: { handle: 'ana' } });
-    expect(pushes[0]).toMatchObject({ name: 'push', params: { lane: 1 }, amount: 1, event: { kind: 'chat', text: '1' } });
-    expect(gifts[0]).toMatchObject({ giftName: 'Rose', coins: 1, count: 5, total: 5 });
-    expect(boosts[0]).toMatchObject({ amount: 5, coins: 5, viewer: { handle: 'bia' } });
+describe('sala de teste', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it('endRound encerra a partida e save fica guardado', async () => {
-    vi.useFakeTimers();
-    live = createLive({ manifest, demo, audience: 'none' });
-    const ends: unknown[] = [];
-    live.on('round.end', (r) => ends.push(r));
-    await live.start();
-    await vi.advanceTimersByTimeAsync(200);
-    live.save({ recorde: 7 });
-    live.endRound({ winner: 'ana' });
-    await vi.advanceTimersByTimeAsync(200);
-    expect(ends).toEqual([expect.objectContaining({ winner: 'ana', round: 1 })]);
-    expect(live.state.phase).toBe('result');
-    expect(live.state.saved).toEqual({ recorde: 7 });
-  });
-});
-
-describe('demo.json', () => {
-  it('o modo local repete a linha do tempo do demo.json', async () => {
-    vi.useFakeTimers();
+  it('sem ?room= e sem token de teste explica o que falta', async () => {
     live = createLive({ manifest, demo });
-    const pushes: Action[] = [];
-    live.onAction('push', (a) => pushes.push(a));
-    expect((await live.start()).source).toBe('simulator');
-    await vi.advanceTimersByTimeAsync(7_500);
-    expect(pushes.map((a) => a.viewer.handle)).toEqual(['ana', 'ana', 'ana']);
-  });
-
-  it('recusa demo.json sem eventos', async () => {
-    live = createLive({ manifest, demo: { events: [] } });
-    await expect(live.start()).rejects.toThrow(/events/);
+    expect(live.state.mode).toBe('test');
+    await expect(live.start()).rejects.toThrow(/token de teste/);
     live = null;
   });
+
+  it('abre a sala de teste na API com o game.json e o demo.json, e testa, pontua e lê o ranking por ela', async () => {
+    vi.stubGlobal('WebSocket', FakeSocket);
+    const api = 'https://api.gamelo.test';
+    const net = fakeFetch({
+      [`POST ${api}/sdk/dev-rooms/dev-sala/test`]: { ok: true },
+      [`POST ${api}/sdk/dev-rooms`]: { room: 'dev-sala', engine: api, game: { slug: 'corrida', name: 'Corrida' } },
+      [`GET ${api}/sdk/rooms/dev-sala/points?limit=5`]: { ranking: [{ rank: 1, platform: 'sim', viewer: { id: 'test:ana' }, points: 60 }] },
+    });
+    live = createLive({ manifest, demo, token: 'lgt_abc', engine: api, devtools: false });
+    const started = live.start();
+    await vi.waitFor(() => expect(FakeSocket.last?.url).toBe('wss://api.gamelo.test/ws?room=dev-sala'));
+    const ws = FakeSocket.last!;
+    ws.serve({ t: 'hello', room: 'dev-sala', game: 'corrida', info: { settings: { meta: 100 }, round: {}, source: 'simulator', saved: null } });
+    ws.serve({ t: 'snapshot', state: { now: Date.now(), phase: 'playing', phaseEndsAt: Date.now() + 60_000, round: 1 }, seq: 1 });
+    expect(await started).toMatchObject({ mode: 'test', room: 'dev-sala', game: 'corrida', source: 'simulator', settings: { meta: 100 } });
+    expect(net.calls[0]).toMatchObject({ method: 'POST', url: `${api}/sdk/dev-rooms`, auth: 'Bearer lgt_abc', body: { manifest, demo, audience: 'sim' } });
+
+    const pushes: Action[] = [];
+    live.onAction('push', (a) => pushes.push(a));
+    await live.test.chat('1', { user: 'ana' });
+    expect(net.calls[1]).toMatchObject({ url: `${api}/sdk/dev-rooms/dev-sala/test`, auth: 'Bearer lgt_abc', body: { kind: 'chat', text: '1', user: 'ana' } });
+    const ana = { id: 'test:ana', handle: 'ana', nickname: 'ana' };
+    const chat = { id: 'e1', kind: 'chat', platform: 'sim', viewer: ana, at: 0, text: '1' };
+    ws.serve({ t: 'events', events: [{ seq: 2, at: 0, type: 'action', payload: { name: 'push', params: { lane: 1 }, event: chat } }] });
+    expect(pushes[0]).toMatchObject({ name: 'push', params: { lane: 1 }, viewer: { handle: 'ana' } });
+
+    live.addPoints(pushes[0]!, 60);
+    expect(ws.sent).toEqual([{ t: 'points', add: [{ platform: 'sim', viewerId: 'test:ana', points: 60, id: 'e1' }] }]);
+    expect((await live.ranking(5))[0]).toMatchObject({ points: 60 });
+    live.endRound({ winner: 'ana' });
+    live.save({ recorde: 7 });
+    expect(ws.sent.slice(1)).toEqual([{ t: 'end', result: { winner: 'ana' } }, { t: 'save', data: { recorde: 7 } }]);
+    net.restore();
+  });
+
+  it('sem `engine`, usa a API da Gamelo', () => {
+    live = createLive({ token: 'lgt_abc' });
+    expect(live.api.engine).toBe('https://api.gamelo.com.br');
+  });
 });
 
-describe('protocolo do motor', () => {
+describe('createApi', () => {
+  it('envia e lista versões com o token de publicação e mostra o erro da API em português', async () => {
+    const api = createApi({ token: 'lgp_pub', engine: 'https://api.gamelo.test/' });
+    expect(api.tokenKind).toBe('publish');
+    expect(createApi({ token: 'lgt_x' }).tokenKind).toBe('test');
+    expect(createApi({ token: 'lg_antigo' }).tokenKind).toBe('publish');
+    const net = fakeFetch({
+      'POST https://api.gamelo.test/sdk/builds': { id: 3, version: '3', notes: 'arena' },
+      'GET https://api.gamelo.test/sdk/builds': [{ id: 3, version: '3', status: 'uploaded', current: false }],
+    });
+    expect(await api.uploadBuild(new Uint8Array([1, 2]), 'arena')).toMatchObject({ version: '3' });
+    const form = net.calls[0]!.body as FormData;
+    expect(net.calls[0]!.auth).toBe('Bearer lgp_pub');
+    expect(form.get('notes')).toBe('arena');
+    expect((form.get('bundle') as File).name).toBe('game.zip');
+    expect(await api.builds()).toMatchObject([{ version: '3', status: 'uploaded' }]);
+    await expect(api.game()).rejects.toMatchObject({ name: 'ApiError', status: 401, message: 'Token do jogo inválido.' });
+    await expect(createApi().builds()).rejects.toThrow(/Falta o token/);
+    net.restore();
+  });
+
+  it('ranking e pontos de um espectador vão sem token, pela chave da sala', async () => {
+    const net = fakeFetch({ 'GET https://api.gamelo.com.br/sdk/rooms/sala%2F1/points/viewer?platform=tiktok&id=a%3A1': { points: 9, rank: 2 } });
+    expect(await createApi().viewerPoints('sala/1', 'tiktok', 'a:1')).toEqual({ points: 9, rank: 2 });
+    expect(net.calls[0]!.auth).toBeNull();
+    net.restore();
+  });
+});
+
+describe('protocolo da sala', () => {
   it('hello + snapshot viram ready; ajustes novos viram settings; relógio do servidor', () => {
     live = createLive({ mode: 'room', room: 'abc' });
     const seen: string[] = [];
@@ -99,40 +155,17 @@ describe('protocolo do motor', () => {
     expect(seen).toEqual(['ready', 'settings:{"a":2}', 'ready']);
   });
 
-  it('pontos da sala viram o evento points; sem addPoints o ranking local fica vazio', async () => {
-    live = createLive({ mode: 'local', manifest, demo });
+  it('pontos da sala viram o evento points', () => {
+    live = createLive({ mode: 'room', room: 'abc' });
     const got: unknown[] = [];
     live.on('points', (p) => got.push(p));
     const viewer = { id: 'v', handle: 'ana', nickname: 'Ana' };
     live.receive({ t: 'events', events: [{ seq: 0, at: 0, type: 'points', payload: { updates: [{ platform: 'tiktok', viewer, added: 10, total: 25 }] } }] });
     expect(got).toEqual([{ platform: 'tiktok', viewer, added: 10, total: 25 }]);
-    expect(await live.ranking()).toEqual([]);
-  });
-
-  it('addPoints e viewerPoints no modo local: memória da página, cada id uma vez', async () => {
-    vi.useFakeTimers();
-    live = createLive({ mode: 'local', manifest, demo });
-    const got: unknown[] = [];
-    live.on('points', (p) => got.push(p));
-    const ana = { id: 'test:ana', handle: 'ana', nickname: 'ana' };
-    const chat: ChatEvent = { kind: 'chat', id: 'e1', platform: 'sim', viewer: ana, at: 0, text: 'porta' };
-    const action: Action = { name: 'palavra', params: {}, viewer: ana, amount: 1, coins: 0, event: chat };
-    live.addPoints(chat, 60);
-    live.addPoints(action, 60); // mesmo evento: não soma de novo
-    live.addPoints(action, 30, 'bonus');
-    live.addPoints({ platform: 'web', viewer: { id: 'web:1', handle: 'bia', nickname: 'bia' } }, 100);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    live.addPoints(chat, 0);
+    live.addPoints({ platform: 'tiktok', viewer }, 0);
     expect(warn).toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(got).toEqual([
-      { platform: 'sim', viewer: ana, added: 60, total: 60 },
-      { platform: 'sim', viewer: ana, added: 30, total: 90 },
-      { platform: 'web', viewer: { id: 'web:1', handle: 'bia', nickname: 'bia' }, added: 100, total: 100 },
-    ]);
-    expect(await live.viewerPoints(action)).toEqual({ platform: 'sim', viewer: ana, points: 90, rank: 2 });
-    expect(await live.viewerPoints({ platform: 'sim', viewer: { id: 'x', handle: 'x', nickname: 'x' } })).toEqual({ platform: 'sim', viewer: { id: 'x' }, points: 0, rank: null });
-    expect((await live.ranking(1)).map((r) => r.viewer.handle)).toEqual(['bia']);
+    warn.mockRestore();
   });
 
   it('na sala, addPoints vai pelo WebSocket e viewerPoints lê da API', async () => {
@@ -179,10 +212,21 @@ describe('controle remoto', () => {
     expect(inputs).toEqual([{ name: 'pular', data: { x: 1 }, platform: 'web', viewer: { id: 'web:a', handle: 'ana', nickname: 'ana' } }]);
   });
 
-  it('createRemote escolhe o modo: dev com token, local sem nada, e exige apelido antes de mandar', async () => {
-    expect(createRemote({ token: 'lg_x', engine: 'http://api' }).state.mode).toBe('dev');
+  it('createRemote: sala de teste com o token de teste, e exige apelido antes de mandar', async () => {
     const r = createRemote();
-    expect(r.state.mode).toBe('local');
+    expect(r.state.mode).toBe('test');
+    await expect(r.start()).rejects.toThrow(/token de teste/);
     await expect(r.send('pular')).rejects.toThrow(/join/);
+    const net = fakeFetch({
+      'GET https://api.gamelo.com.br/sdk/dev-room/remote': { game: 'Corrida', streamer: 'teste', on: true, phase: 'playing' },
+      'POST https://api.gamelo.com.br/sdk/dev-room/remote': { ok: true },
+    });
+    const t = createRemote({ token: 'lgt_abc' });
+    expect(await t.start()).toMatchObject({ mode: 'test', game: 'Corrida', phase: 'playing', on: true });
+    await t.join('ana');
+    await t.send('pular', { x: 1 });
+    expect(net.calls.at(-1)).toMatchObject({ method: 'POST', auth: 'Bearer lgt_abc', body: { nick: 'ana', kind: 'input', name: 'pular', data: { x: 1 } } });
+    t.stop();
+    net.restore();
   });
 });

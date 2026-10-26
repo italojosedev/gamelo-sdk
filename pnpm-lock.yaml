@@ -18,26 +18,6 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@22.20.5)
 
-  engine/core: {}
-
-  engine/gateway:
-    dependencies:
-      '@live/core':
-        specifier: workspace:*
-        version: link:../core
-
-  engine/runtime:
-    dependencies:
-      '@live/core':
-        specifier: workspace:*
-        version: link:../core
-
-  engine/simulator:
-    dependencies:
-      '@live/core':
-        specifier: workspace:*
-        version: link:../core
-
   examples/muscle-shampoo:
     dependencies:
       '@esotericsoftware/spine-pixi-v8':
@@ -63,18 +43,6 @@ importers:
         specifier: ^0.8.3
         version: 0.8.3
     devDependencies:
-      '@live/core':
-        specifier: workspace:*
-        version: link:../../engine/core
-      '@live/gateway':
-        specifier: workspace:*
-        version: link:../../engine/gateway
-      '@live/runtime':
-        specifier: workspace:*
-        version: link:../../engine/runtime
-      '@live/simulator':
-        specifier: workspace:*
-        version: link:../../engine/simulator
       tsup:
         specifier: ^8.5.0
         version: 8.5.1(postcss@8.5.31)(typescript@5.9.3)

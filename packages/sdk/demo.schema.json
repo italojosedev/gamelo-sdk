@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "demo.json da Gamelo",
-  "description": "Público de mentira do jogo: a linha do tempo roda em loop no preview, na revisão, no modo local e na sala de desenvolvimento. Obrigatório no zip.",
+  "description": "Público de mentira do jogo: a linha do tempo roda em loop na prévia do build, na demonstração da loja, na revisão e na sala de teste. Obrigatório no zip.",
   "type": "object",
   "required": [
     "events"

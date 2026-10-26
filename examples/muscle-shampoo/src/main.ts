@@ -5,12 +5,10 @@ import { createLive } from '@gamelo/sdk';
 import { View } from './view';
 import './style.css';
 
-// No `npm run dev` com .env.local, usa a sala de desenvolvimento do motor; sem ele, roda local com público simulado.
-// No build nunca vai token: na live o jogo abre pelo link do overlay (?room=...&engine=...).
+// No `npm run dev`, abre a sala de teste da Gamelo com o token de teste do .env.local (público simulado do demo.json).
+// No build nunca vai token: na live e na prévia o jogo abre pelo link da sala (?room=...&engine=...).
 const live = createLive(
-  import.meta.env.DEV && import.meta.env.VITE_LIVE_TOKEN
-    ? { token: import.meta.env.VITE_LIVE_TOKEN, engine: import.meta.env.VITE_LIVE_ENGINE }
-    : {},
+  import.meta.env.DEV ? { token: import.meta.env.VITE_GAMELO_TEST_TOKEN, engine: import.meta.env.VITE_GAMELO_API } : {},
 );
 
 // ---- estado do jogo ----

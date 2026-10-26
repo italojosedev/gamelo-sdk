@@ -1,14 +1,13 @@
 import { defineConfig } from 'tsup';
 
-// Os pacotes @live/* (motor) entram no arquivo: quem instala o SDK não precisa do monorepo.
 export default defineConfig([
   {
-    entry: { index: 'src/index.ts' },
+    // index: jogo e página de controle (navegador). api: cliente da API da Gamelo, também no Node (CLI, scripts).
+    entry: { index: 'src/index.ts', api: 'src/api.ts' },
     format: ['esm'],
     target: 'es2022',
     dts: true,
     sourcemap: true,
-    noExternal: [/^@live\//],
   },
   {
     // <script src=".../gamelo-sdk.iife.js"> para jogos sem bundler: window.GameloSDK.createLive()
@@ -17,7 +16,6 @@ export default defineConfig([
     globalName: 'GameloSDK',
     target: 'es2022',
     minify: true,
-    noExternal: [/^@live\//],
     outExtension: () => ({ js: '.iife.js' }),
   },
 ]);
