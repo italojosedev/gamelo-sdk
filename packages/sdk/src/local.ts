@@ -61,6 +61,7 @@ export function startLocal(raw: GameManifest, rawDemo: DemoScript, audience: 'si
     send(msg) {
       if (msg.t === 'end') runtime.endRound(msg.result ?? {});
       if (msg.t === 'save') saved = msg.data;
+      // msg.t === 'points': no modo local os pontos ficam no Live (memória da página).
     },
     async test(e) {
       gateway.push(fakeAudience(e));

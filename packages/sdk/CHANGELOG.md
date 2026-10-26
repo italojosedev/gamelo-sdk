@@ -6,6 +6,7 @@ Todas as mudanças do `@gamelo/sdk`. O formato segue o [Keep a Changelog](https:
 
 ### Adicionado
 
+- Pontos dados pelo jogo: `live.addPoints(quem, pontos, id?)` grava na pontuação do jogo do streamer (soma entre lives, cada `id` uma vez) e `live.viewerPoints(quem)` lê os pontos e a posição de um espectador, por exemplo para um comando "!pontos". Em dev e local ficam na memória da página, e `live.ranking()` passa a mostrar esses pontos lá também. Precisa do motor com a mensagem `points` e a rota `/sdk/rooms/<chave>/points/viewer`.
 - Controle remoto por QR code: o jogo declara `remote.page` no `game.json` e leva a própria página de controle no zip; a página usa `createRemote()` (token do jogo no dev, link público do QR na live) e os toques chegam ao jogo como eventos `remote`. Veja a seção do controle remoto no `EVENTS.md`.
 
 ## [0.1.0] - 2026-10-26

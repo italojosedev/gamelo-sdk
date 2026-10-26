@@ -25,7 +25,7 @@ live.on('phase', ({ phase, endsAt, round }) => { /* lobby | countdown | playing 
 live.on('round.end', ({ winner }) => { /* winner vazio = acabou por tempo */ });
 live.on('ready', (s) => { /* s.saved: restaurar depois de recarregar */ });
 live.on('settings', () => { /* releia live.settings */ });
-live.on('points', ({ viewer, added, total }) => { /* pontuação do streamer (só na sala) */ });
+live.on('points', ({ viewer, added, total }) => { /* alguém pontuou (regras do streamer ou addPoints) */ });
 
 await live.start();
 ```
@@ -52,7 +52,7 @@ await live.start();
 - Nunca coloque o token no código que vai para o build. Nunca dê valor em dinheiro a presentes.
 - Overlay transparente em 9:16; deixe topo (~12%) e base (~25%) livres; limite listas e elementos para aguentar horas.
 - `live.endRound()` só funciona em `playing`; `live.save()` aceita até ~60 KB.
-- Pontuação é do streamer (painel > Pontuação), não do game.json: o jogo só mostra com `live.on('points')` e `await live.ranking(5)`, que voltam vazios em dev e local.
+- Regras de pontuação são do streamer (painel > Pontuação), não do game.json. O jogo pode dar os pontos dele com `live.addPoints(a, 60)` (passe a ação/evento de quem ganhou; o id do evento evita somar em dobro) e ler os de alguém com `await live.viewerPoints(a)` → `{ points, rank }` (comando "!pontos"). Mostre com `live.on('points')` e `await live.ranking(5)`. Em dev e local os pontos ficam na memória da página.
 
 ## Controle remoto (opcional)
 
