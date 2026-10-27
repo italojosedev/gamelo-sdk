@@ -9,7 +9,7 @@
     "deploy": "vite build && gamelo deploy"
   },
   "dependencies": {
-    "@gamelo/sdk": "^0.1.0"
+    "@gamelo/sdk": "^0.2.0"
   },
   "devDependencies": {
     "typescript": "~5.9.0",

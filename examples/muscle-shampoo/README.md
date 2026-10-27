@@ -7,6 +7,6 @@ Jogo de live feito com `@gamelo/sdk` (criado com `gamelo init`). Um lutador musc
 Personagens em Spine 4.2 (`public/assets/lutador`, `public/assets/frasco`, `@esotericsoftware/spine-pixi-v8`). A textura do lutador foi reduzida à metade (2048×1024); o `.atlas` mantém o tamanho original da página e o runtime calcula as coordenadas por ele.
 
 ```bash
-pnpm --filter muscle-shampoo dev    # modo local com o público do public/demo.json
+pnpm --filter muscle-shampoo dev    # sala de teste com o público do public/demo.json (VITE_GAMELO_TEST_TOKEN no .env.local)
 pnpm --filter muscle-shampoo pack   # build + game.zip (game.json e demo.json na raiz)
 ```

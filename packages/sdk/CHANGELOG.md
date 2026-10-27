@@ -2,11 +2,24 @@
 
 Todas as mudanças do `@gamelo/sdk`. O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e as versões seguem o [versionamento semântico](https://semver.org/lang/pt-BR/).
 
-## [Não lançado]
+## [0.2.0] - 2026-10-26
+
+O SDK passa a ser só cliente: o motor da Gamelo não vem mais no pacote. No desenvolvimento o jogo roda na **sala de teste** da Gamelo, aberta com o **token de teste**; versões vão com o **token de publicação**.
+
+### Quebra compatibilidade
+
+- Sai o modo `local` (o motor dentro da página) e o modo `dev` vira `test`. `createLive()` sem `?room=` na URL abre a sala de teste e precisa do `token` de teste (`lgt_...`); sem ele, `start()` explica o que falta. O mesmo vale para `createRemote()` (sai o `BroadcastChannel` do modo local).
+- Dois tokens por jogo no painel do publisher, em **Tokens do SDK**: o de teste (`lgt_`) só abre a sala de teste; o de publicação (`lgp_`) só envia versões. O `lg_` de antes vale como de publicação.
+- Variáveis do projeto: `VITE_LIVE_TOKEN` e `VITE_LIVE_ENGINE` → `VITE_GAMELO_TEST_TOKEN` (teste, só com `import.meta.env.DEV`), `GAMELO_PUBLISH_TOKEN` (deploy, sem `VITE_`, o CLI recusa com `VITE_`) e `VITE_GAMELO_API` (opcional). Atualize o `.env.local` e o `createLive` como no `.env.example` e no `src/main.ts` do modelo.
+- A API padrão é `https://api.gamelo.com.br`; `engine` só é preciso para outro ambiente.
+- Pontos na sala de teste (`addPoints`, `viewerPoints`, `ranking`) ficam na memória da API, não mais na da página.
+- A prévia do build no painel e a demonstração da loja rodam numa sala no servidor (modo `room`), não mais no modo local.
 
 ### Adicionado
 
-- Pontos dados pelo jogo: `live.addPoints(quem, pontos, id?)` grava na pontuação do jogo do streamer (soma entre lives, cada `id` uma vez) e `live.viewerPoints(quem)` lê os pontos e a posição de um espectador, por exemplo para um comando "!pontos". Em dev e local ficam na memória da página, e `live.ranking()` passa a mostrar esses pontos lá também. Precisa do motor com a mensagem `points` e a rota `/sdk/rooms/<chave>/points/viewer`.
+- `createApi({ token, engine })` (também em `@gamelo/sdk/api`, para scripts no Node): `game()`, `openTestRoom()`, `test()`, `ranking()`, `viewerPoints()`, `uploadBuild()` e `builds()`, com erros `ApiError` em português. `createLive` e o CLI usam ele por dentro; `live.api` dá acesso ao cliente do jogo.
+- CLI: `gamelo builds` lista as versões enviadas, a revisão de cada uma e qual é a atual; `gamelo deploy` mostra o link da prévia.
+- Pontos dados pelo jogo: `live.addPoints(quem, pontos, id?)` grava na pontuação do jogo do streamer (soma entre lives, cada `id` uma vez) e `live.viewerPoints(quem)` lê os pontos e a posição de um espectador, por exemplo para um comando "!pontos". Precisa do motor com a mensagem `points` e a rota `/sdk/rooms/<chave>/points/viewer`.
 - Controle remoto por QR code: o jogo declara `remote.page` no `game.json` e leva a própria página de controle no zip; a página usa `createRemote()` (token do jogo no dev, link público do QR na live) e os toques chegam ao jogo como eventos `remote`. Veja a seção do controle remoto no `EVENTS.md`.
 
 ## [0.1.0] - 2026-10-26
@@ -28,5 +41,5 @@ Primeira versão pública, separada do repositório da plataforma. Antes se cham
 - `dist/live-sdk.iife.js` / `window.LiveSDK` → `dist/gamelo-sdk.iife.js` / `window.GameloSDK`.
 - `$schema` do `game.json` e do `demo.json`: `../node_modules/@gamelo/sdk/...`.
 
-[Não lançado]: https://github.com/italojosedev/gamelo-sdk/compare/v0.1.0...HEAD
+[0.2.0]: https://github.com/italojosedev/gamelo-sdk/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/italojosedev/gamelo-sdk/releases/tag/v0.1.0

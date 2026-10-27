@@ -10,8 +10,7 @@
     "build": "pnpm --filter @gamelo/sdk build",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "example": "pnpm --filter muscle-shampoo dev",
-    "sync-engine": "node scripts/sync-engine.mjs"
+    "example": "pnpm --filter muscle-shampoo dev"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

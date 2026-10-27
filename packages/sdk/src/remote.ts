@@ -1,21 +1,20 @@
 // Página de controle remoto do jogo: o espectador abre pelo QR code da live
 // e manda comandos para o jogo pelo celular. Mesmo build do jogo, outra página
 // (o `remote.page` do game.json).
-import { LOCAL_REMOTE_CHANNEL, type LocalRemoteMessage } from './client.ts';
+import { GAMELO_API } from './api.ts';
 
-export type RemoteMode = 'room' | 'dev' | 'local';
+export type RemoteMode = 'room' | 'test';
 
 export interface RemoteOptions {
   /**
    * "room": aberta pelo QR code da live (usa ?remote= e ?engine= da URL).
-   * "dev": manda para a sala de desenvolvimento do jogo, com o token do jogo.
-   * "local": fala com o jogo aberto em outra aba (modo local), sem servidor.
-   * "auto" (padrão): room se a URL tem ?remote=, dev se veio `token`, senão local.
+   * "test": manda para a sala de teste do jogo, com o token de teste.
+   * "auto" (padrão): room se a URL tem ?remote=, senão test.
    */
   mode?: RemoteMode | 'auto';
-  /** Token da API do jogo, só no desenvolvimento (o mesmo do createLive). Nunca publique no build. */
+  /** Token de teste do jogo, só no desenvolvimento (o mesmo do createLive). Nunca publique no build. */
   token?: string;
-  /** Endereço da API. Na live vem do ?engine= da URL. */
+  /** Endereço da API. Padrão: https://api.gamelo.com.br; na live vem do ?engine= da URL. */
   engine?: string;
   /** Intervalo entre as leituras da fase do jogo (padrão 3 s). */
   pollMs?: number;
@@ -25,7 +24,7 @@ export interface RemoteState {
   mode: RemoteMode;
   /** Nome do jogo. */
   game: string;
-  /** Nome do streamer (vazio no desenvolvimento). */
+  /** Nome do streamer ("teste" na sala de teste). */
   streamer: string;
   /** false: o streamer desligou o controle (ou o jogo não tem). */
   on: boolean;
@@ -90,11 +89,10 @@ export class Remote {
   private readonly listeners = new Set<Listener>();
   private readonly params: URLSearchParams;
   private timer: ReturnType<typeof setInterval> | undefined;
-  private channel: BroadcastChannel | null = null;
 
   constructor(private readonly opts: RemoteOptions = {}) {
     this.params = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
-    const mode = opts.mode && opts.mode !== 'auto' ? opts.mode : this.params.get('remote') ? 'room' : opts.token ? 'dev' : 'local';
+    const mode = opts.mode && opts.mode !== 'auto' ? opts.mode : this.params.get('remote') ? 'room' : 'test';
     this.device = deviceId();
     this.state = { mode, game: '', streamer: '', on: true, phase: null, nick: storage.get(NICK_KEY) ?? '', error: '' };
   }
@@ -111,34 +109,26 @@ export class Remote {
   }
 
   private get engine(): string {
-    const engine = this.opts.engine ?? this.params.get('engine');
-    if (!engine) throw new Error('[gamelo] Sem `engine`: na live ele vem do ?engine= da URL; no desenvolvimento passe createRemote({ engine, token }).');
-    return engine;
+    // Na live o endereço vem do link do QR; no teste, da opção (padrão: a API da Gamelo).
+    return (this.state.mode === 'room' ? this.params.get('engine') : null) ?? this.opts.engine ?? GAMELO_API;
   }
 
   private url(action: 'info' | 'send'): string {
-    if (this.state.mode === 'dev') return new URL('/sdk/dev-room/remote', this.engine).href;
+    if (this.state.mode === 'test') return new URL('/sdk/dev-room/remote', this.engine).href;
     const key = encodeURIComponent(this.params.get('remote') ?? '');
     return new URL(action === 'info' ? `/remote/${key}` : `/remote/${key}/send`, this.engine).href;
   }
 
   private headers(): Record<string, string> {
     const h: Record<string, string> = { 'content-type': 'application/json' };
-    if (this.state.mode === 'dev' && this.opts.token) h.authorization = `Bearer ${this.opts.token}`;
+    if (this.state.mode === 'test' && this.opts.token) h.authorization = `Bearer ${this.opts.token}`;
     return h;
   }
 
   /** Começa a acompanhar o jogo (fase da partida e se o controle está ligado). */
   async start(): Promise<RemoteState> {
-    if (this.state.mode === 'local') {
-      if (typeof BroadcastChannel === 'undefined') throw new Error('[gamelo] Este navegador não tem BroadcastChannel para o modo local.');
-      this.channel = new BroadcastChannel(LOCAL_REMOTE_CHANNEL);
-      this.channel.onmessage = (m) => {
-        const msg = m.data as LocalRemoteMessage;
-        if (msg?.t === 'state') this.set({ game: msg.game, phase: msg.phase, streamer: 'local' });
-      };
-      this.channel.postMessage({ t: 'hello' } satisfies LocalRemoteMessage);
-      return { ...this.state };
+    if (this.state.mode === 'test' && !this.opts.token) {
+      throw new Error('[gamelo] Sem ?remote= na URL e sem token de teste. No desenvolvimento, passe createRemote({ token }) com o VITE_GAMELO_TEST_TOKEN do .env.local; na live a página abre pelo QR code.');
     }
     await this.poll();
     this.timer = setInterval(() => void this.poll(), this.opts.pollMs ?? 3000);
@@ -159,7 +149,6 @@ export class Remote {
   /** Para de acompanhar o jogo. */
   stop(): void {
     clearInterval(this.timer);
-    this.channel?.close();
   }
 
   /** Entra no jogo com um apelido (letras, números, _ e -, até 16). Fica guardado no aparelho. */
@@ -190,11 +179,6 @@ export class Remote {
   private async post(body: { kind: 'input' | 'chat' | 'like' | 'join'; name?: string; data?: unknown; text?: string }): Promise<void> {
     if (!this.state.nick) throw new RemoteError('Chame remote.join(apelido) antes de mandar comandos.', 400);
     const msg = { device: this.device, nick: this.state.nick, ...body };
-    if (this.state.mode === 'local') {
-      if (!this.channel) throw new Error('[gamelo] Chame remote.start() antes.');
-      this.channel.postMessage({ t: 'send', ...msg } satisfies LocalRemoteMessage);
-      return;
-    }
     const res = await fetch(this.url('send'), { method: 'POST', headers: this.headers(), body: JSON.stringify(msg) });
     if (res.ok) {
       const data = await res.json().catch(() => ({}));

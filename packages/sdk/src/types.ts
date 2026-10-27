@@ -173,8 +173,8 @@ export interface DemoEvent {
 
 /**
  * demo.json (obrigatório no zip): o público de mentira do jogo. A linha do
- * tempo `events` roda em loop no preview do build, na revisão do admin, no
- * modo local e na sala de desenvolvimento; os presentes dela viram os botões
+ * tempo `events` roda em loop na prévia do build, na demonstração da loja, na
+ * revisão do admin e na sala de teste; os presentes dela viram os botões
  * de teste do painel.
  */
 export interface DemoScript {
@@ -201,7 +201,8 @@ export interface GameEvent<P = unknown> {
 }
 
 /** Como o SDK está ligado. */
-export type Mode = 'room' | 'dev' | 'local';
+/** room: sala do streamer (a live). test: sala de teste da Gamelo, com o token de teste. */
+export type Mode = 'room' | 'test';
 export type Status = 'connecting' | 'online' | 'offline';
 
 /** O que o SDK sabe da sala agora. */

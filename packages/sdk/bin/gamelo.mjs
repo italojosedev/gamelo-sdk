@@ -3,7 +3,8 @@
 //
 //   npx @gamelo/sdk init meu-jogo      cria a pasta com o exemplo, as regras e a skill para IA
 //   gamelo pack                            dist/ + game.json + demo.json → game.zip
-//   gamelo deploy                          pack + envia como build novo (LIVE_TOKEN e LIVE_ENGINE)
+//   gamelo deploy                          pack + envia como versão nova (token de publicação)
+//   gamelo builds                          lista as versões enviadas e a revisão de cada uma
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,17 +23,30 @@ function fail(msg) {
   process.exit(1);
 }
 
-/** Lê .env.local / .env da pasta para LIVE_TOKEN e LIVE_ENGINE (aceita também os nomes VITE_). */
+/** Lê uma variável do ambiente ou do .env.local / .env da pasta (aceita também o nome com VITE_). */
 function env(name) {
   if (process.env[name]) return process.env[name];
+  if (process.env[`VITE_${name}`]) return process.env[`VITE_${name}`];
   for (const file of ['.env.local', '.env']) {
     if (!existsSync(file)) continue;
     for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
-      const m = /^\s*(?:VITE_)?([A-Z_]+)\s*=\s*(.*)\s*$/.exec(line);
-      if (m && m[1] === name && m[2]) return m[2].replace(/^["']|["']$/g, '');
+      const m = /^\s*(VITE_)?([A-Z_]+)\s*=\s*(.*)\s*$/.exec(line);
+      if (!m || m[2] !== name || !m[3]) continue;
+      // Com VITE_ o Vite põe o valor no build, que vai para a loja.
+      if (m[1] && name === 'GAMELO_PUBLISH_TOKEN') fail(`tire o VITE_ de VITE_GAMELO_PUBLISH_TOKEN no ${file}: com ele o token de publicação vai junto no build do jogo`);
+      return m[3].replace(/^["']|["']$/g, '');
     }
   }
   return undefined;
+}
+
+/** Cliente da API com o token de publicação (gamelo deploy, gamelo builds). */
+async function publishApi() {
+  const token = flag('token', env('GAMELO_PUBLISH_TOKEN'));
+  if (!token) fail('falta o token de publicação: coloque GAMELO_PUBLISH_TOKEN=lgp_... no .env.local (página do jogo no painel do publisher) ou passe --token');
+  if (token.startsWith('lgt_')) fail('esse é o token de teste; para enviar versões use o token de publicação (lgp_...)');
+  const { createApi } = await import('../dist/api.js');
+  return createApi({ token, engine: flag('engine', env('GAMELO_API')) });
 }
 
 function init() {
@@ -56,9 +70,9 @@ function init() {
 
   cd ${name}
   npm install
-  npm run dev          # roda com público simulado
-  # para usar a sala do motor: copie .env.example para .env.local e cole o token do jogo
-  npm run deploy       # build + envia uma versão nova para o painel`);
+  cp .env.example .env.local   # cole os tokens do jogo (painel do publisher)
+  npm run dev          # sala de teste da Gamelo com público simulado
+  npm run deploy       # build + envia uma versão nova (token de publicação)`);
 }
 
 function pack() {
@@ -100,17 +114,31 @@ function pack() {
 }
 
 async function deploy() {
-  const token = flag('token', env('LIVE_TOKEN'));
-  const engine = flag('engine', env('LIVE_ENGINE'));
-  if (!token || !engine) fail('defina LIVE_TOKEN e LIVE_ENGINE (ou VITE_LIVE_TOKEN e VITE_LIVE_ENGINE no .env.local), ou passe --token e --engine');
+  const api = await publishApi();
   const zipPath = pack();
-  const form = new FormData();
-  form.set('bundle', new Blob([readFileSync(zipPath)], { type: 'application/zip' }), 'game.zip');
-  form.set('notes', flag('notes', ''));
-  const res = await fetch(new URL('/sdk/builds', engine), { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: form });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) fail(Array.isArray(data.message) ? data.message.join('; ') : (data.message ?? `erro ${res.status}`));
-  console.log(`Versão ${data.version} enviada. Peça a revisão no painel do publisher quando quiser publicar.`);
+  try {
+    const build = await api.uploadBuild(new Uint8Array(readFileSync(zipPath)), flag('notes', ''));
+    console.log(`Versão ${build.version} enviada. Prévia: ${build.previewUrl}
+Peça a revisão no painel do publisher quando quiser publicar.`);
+  } catch (err) {
+    fail(err.message);
+  }
+}
+
+async function builds() {
+  const api = await publishApi();
+  try {
+    const list = await api.builds();
+    if (!list.length) return console.log('Nenhuma versão enviada ainda.');
+    const status = { uploaded: 'enviada', approved: 'aprovada', rejected: 'recusada' };
+    for (const b of list) {
+      const when = new Date(b.createdAt).toLocaleString('pt-BR');
+      console.log(`${b.current ? '*' : ' '} ${b.version.padEnd(5)} ${status[b.status].padEnd(9)} ${when}  ${b.notes || ''}${b.reviewNotes ? `  (revisão: ${b.reviewNotes})` : ''}`);
+    }
+    console.log('\n* versão atual, a que os streamers usam');
+  } catch (err) {
+    fail(err.message);
+  }
 }
 
 switch (cmd) {
@@ -123,11 +151,15 @@ switch (cmd) {
   case 'deploy':
     await deploy();
     break;
+  case 'builds':
+    await builds();
+    break;
   default:
     console.log(`gamelo <comando>
 
   init [pasta]                  cria um jogo novo a partir do exemplo
   pack [--dir dist] [--out game.zip]
-  deploy [--notes "o que mudou"] [--token lg_...] [--engine https://api...]`);
+  deploy [--notes "o que mudou"] [--token lgp_...] [--engine https://api...]
+  builds [--token lgp_...]      versões enviadas e a revisão de cada uma`);
     if (cmd && cmd !== 'help' && cmd !== '--help') process.exit(1);
 }

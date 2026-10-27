@@ -1,6 +1,6 @@
-import { showRemoteQr } from '@live/core';
+import { GameloApi, type TestEvent } from './api.ts';
 import { mountDevtools } from './devtools.ts';
-import { startLocal } from './local.ts';
+import { showRemoteQr } from './remote-qr.ts';
 import type {
   Action,
   AudienceEvent,
@@ -23,7 +23,7 @@ import type {
   ViewerPoints,
 } from './types.ts';
 
-/** Mensagens do motor (mesmo protocolo do overlay embutido). */
+/** Mensagens da sala (mesmo protocolo do overlay da Gamelo). */
 export type ServerMessage =
   | { t: 'hello'; room: string; game: string; info?: { settings: Record<string, unknown>; round: unknown; source: string; saved: unknown; remote?: RemoteInfo } }
   | { t: 'snapshot'; state: { now?: number; phase?: string; phaseEndsAt?: number; round?: number }; seq: number }
@@ -34,28 +34,10 @@ export type ClientMessage =
   | { t: 'save'; data: unknown }
   | { t: 'points'; add: { platform: string; viewerId: string; points: number; id?: string }[] };
 
-/** Teto dos pontos de uma vez (o motor recusa acima disso). */
+/** Teto dos pontos de uma vez (a sala recusa acima disso). */
 const MAX_AWARD = 100_000;
 
-/** Evento falso para testar (botões de teste, `live.test.*`). */
-export interface TestEvent {
-  kind: AudienceKind;
-  text?: string;
-  gift?: string;
-  coins?: number;
-  count?: number;
-  user?: string;
-  platform?: 'tiktok' | 'twitch' | 'youtube' | 'kick' | 'web';
-}
-
-/** Canal entre a página de controle e o jogo no modo local (abas do mesmo navegador). */
-export const LOCAL_REMOTE_CHANNEL = 'gamelo-remote';
-export type LocalRemoteMessage =
-  | { t: 'hello' }
-  | { t: 'state'; game: string; phase: string }
-  | { t: 'send'; device: string; nick: string; kind: 'input' | 'chat' | 'like' | 'join'; name?: string; data?: unknown; text?: string };
-
-/** Ligação com o motor: WebSocket (sala ou desenvolvimento) ou o motor rodando na própria página. */
+/** Ligação com a sala da Gamelo pelo WebSocket (a do streamer ou a de teste). */
 export interface Transport {
   start(receive: (msg: ServerMessage) => void): Promise<void>;
   send(msg: ClientMessage): void;
@@ -65,15 +47,17 @@ export interface Transport {
 
 export interface LiveOptions {
   /**
-   * "room": overlay da sala do streamer (usa ?room= e ?engine= da URL; é como o jogo roda na live).
-   * "dev": sala de desenvolvimento no motor, com o token do jogo e público simulado.
-   * "local": tudo na página, sem servidor (prévia, testes, sem internet).
-   * "auto" (padrão): room se a URL tem ?room=, dev se veio `token`, senão local.
+   * "room": overlay da sala do streamer (usa ?room= e ?engine= da URL; é como o jogo roda na live e na prévia do build).
+   * "test": sala de teste da Gamelo, com o token de teste e o público simulado do demo.json.
+   * "auto" (padrão): room se a URL tem ?room=, senão test.
    */
   mode?: Mode | 'auto';
-  /** Token da API do jogo (painel do publisher). Só no desenvolvimento: nunca publique o token no build. */
+  /**
+   * Token de teste do jogo (`lgt_...`, página do jogo no painel do publisher).
+   * Só no desenvolvimento: passe com `import.meta.env.DEV ? { token } : {}` para não ir no build.
+   */
   token?: string;
-  /** Endereço da API da Gamelo (ex.: https://api.exemplo.com). Na sala vem do ?engine= da URL. */
+  /** Endereço da API da Gamelo. Padrão: https://api.gamelo.com.br; na sala vem do ?engine= da URL. */
   engine?: string;
   /** Chave da sala. Padrão: ?room= da URL. */
   room?: string;
@@ -81,9 +65,9 @@ export interface LiveOptions {
   manifest?: GameManifest;
   /** demo.json do jogo (eventos do preview). Padrão: busca ./demo.json ao lado do index.html. */
   demo?: DemoScript;
-  /** dev e local: "sim" repete o demo.json (padrão); "none" deixa só os eventos de teste. */
+  /** Sala de teste: "sim" repete o demo.json (padrão); "none" deixa só os eventos de teste. */
   audience?: 'sim' | 'none';
-  /** Painel de teste flutuante (padrão: ligado em dev e local, nunca na sala). */
+  /** Painel de teste flutuante (padrão: ligado na sala de teste, nunca na do streamer). */
   devtools?: boolean;
   /**
    * QR code do controle remoto (o streamer liga em "Controlar sala"): o SDK
@@ -105,7 +89,7 @@ export class Live {
   readonly state: RoomState;
   /** Controle remoto ligado com QR na tela: link da página, imagem do QR, canto e tamanho. null quando desligado. */
   remote: RemoteInfo | null = null;
-  /** Eventos falsos para testar (dev e local). */
+  /** Eventos falsos para testar (sala de teste). */
   readonly test: {
     chat(text: string, opts?: Omit<TestEvent, 'kind' | 'text'>): Promise<void>;
     gift(name: string, opts?: Omit<TestEvent, 'kind' | 'gift'>): Promise<void>;
@@ -122,14 +106,15 @@ export class Live {
   private manifestValue: GameManifest | null;
   private demoValue: DemoScript | null;
   private readonly params: URLSearchParams;
-  /** dev e local: pontos só na memória da página (a sala de verdade grava no banco). */
-  private readonly memoryPoints = new Map<string, { platform: string; viewer: Viewer; points: number }>();
-  private readonly memoryAwarded = new Set<string>();
+  /** Cliente da API (sala de teste, ranking, pontos). */
+  readonly api: GameloApi;
 
   constructor(private readonly opts: LiveOptions = {}) {
     this.params = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
     const room = opts.room ?? this.params.get('room') ?? '';
-    const mode: Mode = opts.mode && opts.mode !== 'auto' ? opts.mode : room ? 'room' : opts.token ? 'dev' : 'local';
+    const mode: Mode = opts.mode && opts.mode !== 'auto' ? opts.mode : room ? 'room' : 'test';
+    // Na sala o endereço vem do link do overlay (?engine=); no teste, da opção (padrão: a API da Gamelo).
+    this.api = new GameloApi({ token: opts.token, engine: (mode === 'room' ? this.params.get('engine') : null) ?? opts.engine ?? (mode === 'room' && typeof location !== 'undefined' ? location.origin : undefined) });
     this.manifestValue = opts.manifest ?? null;
     this.demoValue = opts.demo ?? null;
     this.state = { mode, status: 'offline', room, game: '', phase: 'lobby', round: 0, phaseEndsAt: 0, settings: {}, source: '', saved: null };
@@ -184,47 +169,26 @@ export class Live {
         resolve(s);
       });
     });
-    this.setStatus('connecting');
     const { mode } = this.state;
-    if (mode !== 'room') {
+    if (mode === 'room' && !this.state.room) throw new Error('[gamelo] Sem ?room= na URL: abra o jogo pelo link do overlay da sala.');
+    if (mode === 'test' && !this.opts.token) {
+      throw new Error(
+        '[gamelo] Sem ?room= na URL e sem token de teste. No desenvolvimento, coloque VITE_GAMELO_TEST_TOKEN=lgt_... no .env.local (o token de teste fica na página do jogo, no painel do publisher). Na live o jogo abre pelo link do overlay do streamer.',
+      );
+    }
+    this.setStatus('connecting');
+    if (mode === 'test') {
       this.manifestValue ??= await loadJson<GameManifest>('game.json', 'manifest');
       this.demoValue ??= await loadJson<DemoScript>('demo.json', 'demo');
-    }
-    if (mode === 'room') {
-      const engine = this.opts.engine ?? this.params.get('engine') ?? location.origin;
-      if (!this.state.room) throw new Error('Sem ?room= na URL: abra o jogo pelo link do overlay da sala.');
-      this.transport = socketTransport(engine, () => this.state.room, (s) => this.setStatus(s));
-    } else if (mode === 'dev') {
-      const engine = this.opts.engine;
-      if (!engine || !this.opts.token) throw new Error('O modo dev precisa de `engine` (URL da API) e `token` (painel do publisher).');
-      this.transport = devTransport(engine, this.opts.token, this.manifestValue!, this.demoValue!, this.opts.audience ?? 'sim', (s) => this.setStatus(s), (room) => {
+      this.transport = testTransport(this.api, this.manifestValue, this.demoValue, this.opts.audience ?? 'sim', (s) => this.setStatus(s), (room) => {
         this.state.room = room;
       });
     } else {
-      this.transport = startLocal(this.manifestValue!, this.demoValue!, this.opts.audience ?? 'sim');
+      this.transport = socketTransport(this.api.engine, () => this.state.room, (s) => this.setStatus(s));
     }
     await this.transport.start((msg) => this.receive(msg));
-    if (mode === 'local') this.listenLocalRemote();
-    if (mode !== 'room' && (this.opts.devtools ?? true) && typeof document !== 'undefined') mountDevtools(this);
+    if (mode === 'test' && (this.opts.devtools ?? true) && typeof document !== 'undefined') mountDevtools(this);
     return ready;
-  }
-
-  /**
-   * Modo local: a página de controle aberta em outra aba (createRemote() sem
-   * token) fala com o jogo por BroadcastChannel, sem servidor.
-   */
-  private listenLocalRemote() {
-    if (typeof BroadcastChannel === 'undefined') return;
-    const channel = new BroadcastChannel(LOCAL_REMOTE_CHANNEL);
-    channel.onmessage = (m) => {
-      const msg = m.data as LocalRemoteMessage;
-      if (msg?.t === 'hello') channel.postMessage({ t: 'state', game: this.manifest?.name ?? '', phase: this.state.phase } satisfies LocalRemoteMessage);
-      if (msg?.t !== 'send') return;
-      const viewer = { id: `web:${msg.device}`, handle: msg.nick, nickname: msg.nick };
-      if (msg.kind === 'input') this.play({ seq: 0, at: Date.now(), type: 'remote', payload: { name: msg.name, data: msg.data ?? null, platform: 'web', viewer } });
-      else void this.transport?.test({ kind: msg.kind, text: msg.text, user: msg.nick, platform: 'web' });
-    };
-    this.on('phase', (p) => channel.postMessage({ t: 'state', game: this.manifest?.name ?? '', phase: p.phase } satisfies LocalRemoteMessage));
   }
 
   /** Hora do servidor em ms. Use no lugar de Date.now() para cronômetros e animações. */
@@ -251,36 +215,29 @@ export class Live {
     this.transport?.send({ t: 'save', data });
   }
 
-  /** URL da foto de perfil pelo proxy do motor (o navegador do OBS bloqueia as originais por CORS). */
+  /** URL da foto de perfil pelo proxy da Gamelo (o navegador do OBS bloqueia as originais por CORS). */
   avatar(url: string | undefined): string | undefined {
     if (!url) return undefined;
-    const base = this.state.mode === 'local' ? '' : (this.opts.engine ?? this.params.get('engine') ?? '');
-    return base ? `${base.replace(/\/$/, '')}/avatar?u=${encodeURIComponent(url)}` : url;
+    return `${this.api.engine}/avatar?u=${encodeURIComponent(url)}`;
   }
 
   /**
    * Ranking de pontos dos espectadores nesta sala, do maior para o menor
-   * (até 100). Na sala do streamer vem do banco; em dev e local, dos pontos
-   * dados com `addPoints` nesta página. Para atualizar ao vivo, ouça `live.on('points', ...)`.
+   * (até 100). Na sala do streamer vem do banco; na sala de teste, dos pontos
+   * dados com `addPoints` (ficam na memória da API). Para atualizar ao vivo, ouça `live.on('points', ...)`.
    */
   async ranking(limit = 10): Promise<RankingEntry[]> {
-    const max = Math.min(Math.max(1, Math.floor(limit)), 100);
-    if (this.state.mode !== 'room') return this.memoryRanking().slice(0, max);
     if (!this.state.room) return [];
-    const url = this.engineUrl(`/sdk/rooms/${encodeURIComponent(this.state.room)}/points`);
-    url.searchParams.set('limit', String(max));
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`[gamelo] ranking: erro ${res.status}`);
-    return ((await res.json()) as { ranking: RankingEntry[] }).ranking;
+    return this.api.ranking(this.state.room, limit);
   }
 
   /**
    * Dá pontos a um espectador (um acerto, uma vitória). Na sala do streamer
    * eles vão para a pontuação do jogo no banco e somam entre lives, como os
-   * das regras do streamer; chega um evento `points` com o total. Inteiro de 1
-   * a 100 mil, só para quem já mandou algo na sala. Passe o evento, a ação ou o
-   * comando remoto de quem ganhou; o `id` do evento (ou o `id` que você passar)
-   * conta uma vez só, mesmo com dois overlays abertos.
+   * das regras do streamer; na sala de teste ficam na memória da API. Chega um
+   * evento `points` com o total. Inteiro de 1 a 100 mil, só para quem já mandou
+   * algo na sala. Passe o evento, a ação ou o comando remoto de quem ganhou; o
+   * `id` do evento (ou o `id` que você passar) conta uma vez só, mesmo com dois overlays abertos.
    */
   addPoints(who: PointsTarget, points: number, id?: string): void {
     const t = target(who);
@@ -290,22 +247,7 @@ export class Live {
       return;
     }
     const awardId = id ?? t.id;
-    if (this.state.mode === 'room') {
-      this.transport?.send({ t: 'points', add: [{ platform: t.platform, viewerId: t.viewer.id, points: n, ...(awardId ? { id: String(awardId) } : {}) }] });
-      return;
-    }
-    const key = `${t.platform}:${t.viewer.id}`;
-    if (awardId) {
-      if (this.memoryAwarded.has(`${key}:${awardId}`)) return;
-      this.memoryAwarded.add(`${key}:${awardId}`);
-    }
-    const row = this.memoryPoints.get(key) ?? { platform: t.platform, viewer: t.viewer, points: 0 };
-    row.points += n;
-    row.viewer = t.viewer;
-    this.memoryPoints.set(key, row);
-    // Igual à sala: o aviso chega depois, não dentro de quem chamou.
-    const update: PointsUpdate = { platform: t.platform as PointsUpdate['platform'], viewer: t.viewer, added: n, total: row.points };
-    setTimeout(() => this.emit('points', update), 0);
+    this.transport?.send({ t: 'points', add: [{ platform: t.platform, viewerId: t.viewer.id, points: n, ...(awardId ? { id: String(awardId) } : {}) }] });
   }
 
   /**
@@ -316,28 +258,8 @@ export class Live {
   async viewerPoints(who: PointsTarget): Promise<ViewerPoints> {
     const t = target(who);
     if (!t) throw new Error('[gamelo] viewerPoints: passe o evento, a ação ou o comando remoto do espectador');
-    if (this.state.mode !== 'room') {
-      const row = this.memoryPoints.get(`${t.platform}:${t.viewer.id}`);
-      if (!row) return { platform: t.platform, viewer: { id: t.viewer.id }, points: 0, rank: null };
-      const rank = this.memoryRanking().findIndex((r) => r.platform === row.platform && r.viewer.id === row.viewer.id) + 1;
-      return { platform: row.platform, viewer: row.viewer, points: row.points, rank };
-    }
-    const url = this.engineUrl(`/sdk/rooms/${encodeURIComponent(this.state.room)}/points/viewer`);
-    url.searchParams.set('platform', t.platform);
-    url.searchParams.set('id', t.viewer.id);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`[gamelo] viewerPoints: erro ${res.status}`);
-    return (await res.json()) as ViewerPoints;
-  }
-
-  private memoryRanking(): RankingEntry[] {
-    return [...this.memoryPoints.values()]
-      .sort((a, b) => b.points - a.points)
-      .map((r, i) => ({ rank: i + 1, platform: r.platform as RankingEntry['platform'], viewer: r.viewer, points: r.points }));
-  }
-
-  private engineUrl(path: string): URL {
-    return new URL(path, this.opts.engine ?? this.params.get('engine') ?? location.origin);
+    if (!this.state.room) return { platform: t.platform, viewer: { id: t.viewer.id }, points: 0, rank: null };
+    return this.api.viewerPoints(this.state.room, t.platform, t.viewer.id);
   }
 
   /** Desconecta. */
@@ -349,7 +271,7 @@ export class Live {
 
   private async sendTest(e: TestEvent): Promise<void> {
     if (!this.transport) throw new Error('Chame live.start() antes');
-    if (this.state.mode === 'room') throw new Error('Eventos de teste não valem na sala do streamer: use o "Testar" do painel.');
+    if (this.state.mode === 'room') throw new Error('[gamelo] Eventos de teste não valem na sala do streamer: use o "Testar" do painel.');
     await this.transport.test(e);
   }
 
@@ -369,7 +291,7 @@ export class Live {
     }
   }
 
-  /** Mensagem do motor → estado e eventos do jogo. Exposto para testes. */
+  /** Mensagem da sala → estado e eventos do jogo. Exposto para testes. */
   receive(msg: ServerMessage): void {
     if (msg.t === 'hello') {
       const changed = JSON.stringify(msg.info?.settings ?? {}) !== JSON.stringify(this.state.settings);
@@ -452,7 +374,7 @@ export class Live {
 
   private syncClock(serverNow: number) {
     const sample = serverNow - Date.now();
-    // A mensagem chega com atraso: suaviza e favorece as amostras maiores (igual ao overlay do motor).
+    // A mensagem chega com atraso: suaviza e favorece as amostras maiores (igual ao overlay da Gamelo).
     this.offset = this.synced ? Math.max(sample, this.offset * 0.9 + sample * 0.1) : sample;
     this.synced = true;
   }
@@ -465,7 +387,7 @@ function target(who: PointsTarget | null | undefined): { platform: string; viewe
   return t;
 }
 
-/** Evento "audience" do motor → evento do SDK. */
+/** Evento "audience" da sala → evento do SDK. */
 export function toAudience(p: any): AudienceEvent | null {
   if (!p || !KINDS.includes(p.kind)) return null;
   const base = { id: String(p.id ?? ''), platform: p.platform ?? 'sim', viewer: p.viewer, at: Number(p.at ?? Date.now()) };
@@ -510,7 +432,7 @@ function socketTransport(engine: string, room: () => string, status: (s: Status)
     ws.onclose = async (ev) => {
       if (closed) return;
       status('connecting');
-      // 4004: a sala não existe (ex.: a de desenvolvimento fechou por falta de overlay); o dev abre outra.
+      // 4004: a sala não existe (ex.: a de teste fechou por falta de overlay); o teste abre de novo.
       if (ev.code === 4004 && onGone) await onGone().catch((err) => console.error('[gamelo]', err));
       setTimeout(connect, 2000);
     };
@@ -533,24 +455,14 @@ function socketTransport(engine: string, room: () => string, status: (s: Status)
   };
 }
 
-/** Sala de desenvolvimento: pede a sala para a API com o token e o game.json local. */
-function devTransport(engine: string, token: string, manifest: GameManifest, demo: DemoScript, audience: 'sim' | 'none', status: (s: Status) => void, setRoom: (room: string) => void): Transport {
-  const api = async (path: string, body: unknown) => {
-    const res = await fetch(new URL(path, engine), {
-      method: 'POST',
-      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(`[gamelo] ${data.message ?? `erro ${res.status}`}`);
-    return data;
-  };
+/** Sala de teste: abre na API com o token de teste e o game.json e o demo.json locais. */
+function testTransport(api: GameloApi, manifest: GameManifest, demo: DemoScript, audience: 'sim' | 'none', status: (s: Status) => void, setRoom: (room: string) => void): Transport {
   let room = '';
   const open = async () => {
-    room = (await api('/sdk/dev-rooms', { manifest, demo, audience })).room;
+    room = (await api.openTestRoom({ manifest, demo, audience })).room;
     setRoom(room);
   };
-  const socket = socketTransport(engine, () => room, status, open);
+  const socket = socketTransport(api.engine, () => room, status, open);
   return {
     async start(receive) {
       await open();
@@ -558,7 +470,7 @@ function devTransport(engine: string, token: string, manifest: GameManifest, dem
     },
     send: (msg) => socket.send(msg),
     async test(e) {
-      await api(`/sdk/dev-rooms/${room}/test`, e);
+      await api.test(room, e);
     },
     close: () => socket.close(),
   };
@@ -569,4 +481,4 @@ export function createLive(options: LiveOptions = {}): Live {
   return new Live(options);
 }
 
-export type { AudienceKind };
+export type { AudienceKind, TestEvent };

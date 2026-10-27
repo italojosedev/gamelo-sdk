@@ -1,11 +1,11 @@
-import type { RemoteInfo } from './index.ts';
+import type { RemoteInfo } from './types.ts';
 
 const ID = 'live-remote-qr';
 
 /**
  * Mostra (ou tira, com null) o QR code do controle remoto por cima do jogo,
  * num canto da tela. Medidas em "unidades de tela 9:16" para ficar igual no
- * OBS e na prévia. Usado pelo SDK de jogos (e pelo overlay do motor).
+ * OBS e na prévia. Mesmo desenho do overlay da Gamelo.
  */
 export function showRemoteQr(remote: RemoteInfo | null | undefined): void {
   if (typeof document === 'undefined') return;
