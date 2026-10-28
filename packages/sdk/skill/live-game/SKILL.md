@@ -60,7 +60,7 @@ Se o jogo tiver página de controle para o celular do espectador (o streamer lig
 
 1. `public/game.json`: `"remote": { "page": "controle.html" }` (`"qr": false` se o jogo desenha o QR com `live.remote`).
 2. `controle.html` na raiz + `src/controle.ts` com `createRemote()` (token de teste só no dev, igual ao `createLive`); peça o apelido e chame `remote.join(apelido)`, depois `remote.send('nome', dados)`; `remote.chat(texto)` só para textos que casam com uma regra de comentário.
-3. No jogo: `live.on('remote', ({ name, data, viewer }) => ...)`.
+3. No jogo: `live.on('remote', ({ name, data, viewer }) => ...)`. Para a página mostrar algo do jogo (ex.: letras já testadas), `live.shareRemote({ ... })` (JSON até 2 KB, mande só quando mudar) e leia `remote.state.shared` no `remote.onChange`.
 4. `vite.config.ts`: as duas páginas em `build.rollupOptions.input`. Página mobile, botões grandes, mostre `remote.state.phase` e o aviso de desligado. Detalhes em `docs/EVENTS.md` > Controle remoto.
 
 ## Entregar

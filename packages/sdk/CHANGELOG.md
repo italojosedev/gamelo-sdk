@@ -2,6 +2,12 @@
 
 Todas as mudanças do `@gamelo/sdk`. O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e as versões seguem o [versionamento semântico](https://semver.org/lang/pt-BR/).
 
+## [0.3.0] - 2026-10-28
+
+### Adicionado
+
+- Estado do jogo para o controle remoto: `live.shareRemote(dados)` guarda na sala um JSON de até 2 KB que as páginas de controle leem em `remote.state.shared` (a cada `pollMs`, agora com mínimo de 1 s). O SDK só manda quando o estado muda e repete ao reconectar. Usado pelo Termelo para pintar o teclado do celular com as letras já testadas. Precisa da API com a mensagem `remote` e o campo `shared` em `GET /remote/<chave>` e `GET /sdk/dev-room/remote`.
+
 ## [0.2.0] - 2026-10-26
 
 O SDK passa a ser só cliente: o motor da Gamelo não vem mais no pacote. No desenvolvimento o jogo roda na **sala de teste** da Gamelo, aberta com o **token de teste**; versões vão com o **token de publicação**.

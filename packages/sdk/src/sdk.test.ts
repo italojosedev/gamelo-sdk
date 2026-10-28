@@ -212,17 +212,34 @@ describe('controle remoto', () => {
     expect(inputs).toEqual([{ name: 'pular', data: { x: 1 }, platform: 'web', viewer: { id: 'web:a', handle: 'ana', nickname: 'ana' } }]);
   });
 
+  it('shareRemote manda o estado para os celulares só quando muda, e de novo ao reconectar', () => {
+    live = createLive({ manifest, demo, mode: 'room', room: 'sala' });
+    const sent: unknown[] = [];
+    (live as any).transport = { send: (m: unknown) => sent.push(m), close() {} };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    live.shareRemote({ k: 'gyx' });
+    live.shareRemote({ k: 'gyx' });
+    live.shareRemote('x'.repeat(3000));
+    expect(warn).toHaveBeenCalled();
+    live.receive({ t: 'hello', room: 'sala', game: 'corrida', info: { settings: {}, round: {}, source: 'tiktok', saved: null } });
+    expect(sent).toEqual([
+      { t: 'remote', data: { k: 'gyx' } },
+      { t: 'remote', data: { k: 'gyx' } },
+    ]);
+    warn.mockRestore();
+  });
+
   it('createRemote: sala de teste com o token de teste, e exige apelido antes de mandar', async () => {
     const r = createRemote();
     expect(r.state.mode).toBe('test');
     await expect(r.start()).rejects.toThrow(/token de teste/);
     await expect(r.send('pular')).rejects.toThrow(/join/);
     const net = fakeFetch({
-      'GET https://api.gamelo.com.br/sdk/dev-room/remote': { game: 'Corrida', streamer: 'teste', on: true, phase: 'playing' },
+      'GET https://api.gamelo.com.br/sdk/dev-room/remote': { game: 'Corrida', streamer: 'teste', on: true, phase: 'playing', shared: { k: 'g' } },
       'POST https://api.gamelo.com.br/sdk/dev-room/remote': { ok: true },
     });
     const t = createRemote({ token: 'lgt_abc' });
-    expect(await t.start()).toMatchObject({ mode: 'test', game: 'Corrida', phase: 'playing', on: true });
+    expect(await t.start()).toMatchObject({ mode: 'test', game: 'Corrida', phase: 'playing', on: true, shared: { k: 'g' } });
     await t.join('ana');
     await t.send('pular', { x: 1 });
     expect(net.calls.at(-1)).toMatchObject({ method: 'POST', auth: 'Bearer lgt_abc', body: { nick: 'ana', kind: 'input', name: 'pular', data: { x: 1 } } });
