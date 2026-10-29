@@ -32,10 +32,13 @@ export type ServerMessage =
 export type ClientMessage =
   | { t: 'end'; result?: { winner?: string; summary?: unknown } }
   | { t: 'save'; data: unknown }
-  | { t: 'points'; add: { platform: string; viewerId: string; points: number; id?: string }[] };
+  | { t: 'points'; add: { platform: string; viewerId: string; points: number; id?: string }[] }
+  | { t: 'remote'; data: unknown };
 
 /** Teto dos pontos de uma vez (a sala recusa acima disso). */
 const MAX_AWARD = 100_000;
+/** Tamanho máximo do estado do controle remoto (shareRemote), em JSON. */
+const MAX_SHARED = 2048;
 
 /** Ligação com a sala da Gamelo pelo WebSocket (a do streamer ou a de teste). */
 export interface Transport {
@@ -215,6 +218,25 @@ export class Live {
     this.transport?.send({ t: 'save', data });
   }
 
+  private sharedJson = 'null';
+
+  /**
+   * Manda um estado pequeno (JSON de até 2 KB) para as páginas do controle remoto,
+   * que leem em `remote.state.shared` (ex.: as letras já testadas, para pintar o
+   * teclado no celular). Vale o último mandado; `null` limpa. Os celulares leem a
+   * cada poucos segundos, então mande só o que a página precisa.
+   */
+  shareRemote(data: unknown): void {
+    const json = JSON.stringify(data ?? null);
+    if (json.length > MAX_SHARED) {
+      console.warn(`[gamelo] shareRemote: o estado tem ${json.length} bytes; o máximo é ${MAX_SHARED}`);
+      return;
+    }
+    if (json === this.sharedJson) return;
+    this.sharedJson = json;
+    this.transport?.send({ t: 'remote', data: data ?? null });
+  }
+
   /** URL da foto de perfil pelo proxy da Gamelo (o navegador do OBS bloqueia as originais por CORS). */
   avatar(url: string | undefined): string | undefined {
     if (!url) return undefined;
@@ -303,6 +325,8 @@ export class Live {
         this.state.source = msg.info.source;
         this.state.saved = msg.info.saved ?? null;
       }
+      // Sala nova ou reconectada: os celulares voltam a ver o último estado mandado.
+      if (this.sharedJson !== 'null') this.transport?.send({ t: 'remote', data: JSON.parse(this.sharedJson) });
       this.pendingReady = true;
       if (changed && this.readyOnce) this.emit('settings', this.state.settings);
       this.setStatus('online');

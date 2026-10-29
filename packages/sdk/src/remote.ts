@@ -16,7 +16,7 @@ export interface RemoteOptions {
   token?: string;
   /** Endereço da API. Padrão: https://api.gamelo.com.br; na live vem do ?engine= da URL. */
   engine?: string;
-  /** Intervalo entre as leituras da fase do jogo (padrão 3 s). */
+  /** Intervalo entre as leituras da fase do jogo e do `shared` (padrão 3 s, mínimo 1 s). */
   pollMs?: number;
 }
 
@@ -32,6 +32,8 @@ export interface RemoteState {
   phase: string | null;
   /** Apelido escolhido (remote.join). Vazio antes de entrar. */
   nick: string;
+  /** Último estado que o jogo mandou com `live.shareRemote(...)`, ou null. */
+  shared: unknown;
   /** Última mensagem de erro (para mostrar na página), ou "". */
   error: string;
 }
@@ -94,10 +96,10 @@ export class Remote {
     this.params = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
     const mode = opts.mode && opts.mode !== 'auto' ? opts.mode : this.params.get('remote') ? 'room' : 'test';
     this.device = deviceId();
-    this.state = { mode, game: '', streamer: '', on: true, phase: null, nick: storage.get(NICK_KEY) ?? '', error: '' };
+    this.state = { mode, game: '', streamer: '', on: true, phase: null, nick: storage.get(NICK_KEY) ?? '', shared: null, error: '' };
   }
 
-  /** Ouve as mudanças de estado (fase, ligado/desligado, apelido, erro). Devolve a função para parar de ouvir. */
+  /** Ouve as mudanças de estado (fase, estado do jogo, ligado/desligado, apelido, erro). Devolve a função para parar de ouvir. */
   onChange(fn: Listener): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -131,7 +133,7 @@ export class Remote {
       throw new Error('[gamelo] Sem ?remote= na URL e sem token de teste. No desenvolvimento, passe createRemote({ token }) com o VITE_GAMELO_TEST_TOKEN do .env.local; na live a página abre pelo QR code.');
     }
     await this.poll();
-    this.timer = setInterval(() => void this.poll(), this.opts.pollMs ?? 3000);
+    this.timer = setInterval(() => void this.poll(), Math.max(1000, this.opts.pollMs ?? 3000));
     return { ...this.state };
   }
 
@@ -140,7 +142,7 @@ export class Remote {
       const res = await fetch(this.url('info'), { headers: this.headers() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return this.set({ error: data.message ?? `erro ${res.status}`, on: res.status === 404 ? false : this.state.on });
-      this.set({ game: data.game ?? '', streamer: data.streamer ?? '', on: !!data.on, phase: data.phase ?? null, error: '' });
+      this.set({ game: data.game ?? '', streamer: data.streamer ?? '', on: !!data.on, phase: data.phase ?? null, shared: data.shared ?? null, error: '' });
     } catch {
       this.set({ error: 'Sem conexão. Tentando de novo…' });
     }

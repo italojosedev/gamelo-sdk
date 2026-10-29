@@ -175,7 +175,9 @@ Na página de controle, `createRemote()`:
 | `remote.chat(texto)` | Comentário normal (platform `web`): passa pelas regras e pela pontuação. Só aceita texto que casa com uma regra de comentário. |
 | `remote.like()` | Curtida normal (platform `web`). |
 
-`remote.state` traz `game`, `streamer`, `on` (o streamer ligou), `phase` (null com o jogo fechado), `nick` e `error`; `remote.onChange(fn)` avisa quando muda. Limite por aparelho: 1 toque a cada 100 ms e 50 a cada 10 s. Presentes não passam pelo controle.
+`remote.state` traz `game`, `streamer`, `on` (o streamer ligou), `phase` (null com o jogo fechado), `shared`, `nick` e `error`; `remote.onChange(fn)` avisa quando muda.
+
+Do jogo para os celulares: `live.shareRemote(dados)` guarda na sala um estado pequeno (JSON de até 2 KB; vale o último, `null` limpa) que as páginas de controle leem em `remote.state.shared` junto com a fase, a cada `pollMs` (padrão 3 s, mínimo 1 s). Serve para a página mostrar o que importa do jogo, por exemplo as letras já testadas para pintar o teclado. O SDK só manda quando muda e manda de novo quando a sala reconecta. Limite por aparelho: 1 toque a cada 100 ms e 50 a cada 10 s. Presentes não passam pelo controle.
 
 ## demo.json (obrigatório)
 
@@ -218,7 +220,7 @@ WebSocket em `<engine>/ws?room=<chave>`. O servidor manda JSON:
 - `{ "t": "snapshot", "state": { "now", "phase", "phaseEndsAt", "round", "seq" }, "seq" }` (a cada mudança e pelo menos 1 vez por segundo)
 - `{ "t": "events", "events": [{ "seq", "at", "type", "payload" }] }` com `type` = `audience`, `action`, `phase`, `round.end`, `points` (payload `{ updates: [{ platform, viewer, added, total }] }`, `seq` 0)
 
-O jogo pode mandar `{ "t": "end", "result": { "winner" } }`, `{ "t": "save", "data": … }` e `{ "t": "points", "add": [{ "platform", "viewerId", "points", "id" }] }` (até 50 por mensagem). O ranking da sala está em `GET <engine>/sdk/rooms/<chave>/points?limit=10` e os pontos de um espectador em `GET <engine>/sdk/rooms/<chave>/points/viewer?platform=<plataforma>&id=<viewer.id>`.
+O jogo pode mandar `{ "t": "end", "result": { "winner" } }`, `{ "t": "save", "data": … }`, `{ "t": "remote", "data": … }` (estado do controle remoto, até 2 KB, volta como `shared` em `GET <engine>/remote/<chave>`) e `{ "t": "points", "add": [{ "platform", "viewerId", "points", "id" }] }` (até 50 por mensagem). O ranking da sala está em `GET <engine>/sdk/rooms/<chave>/points?limit=10` e os pontos de um espectador em `GET <engine>/sdk/rooms/<chave>/points/viewer?platform=<plataforma>&id=<viewer.id>`.
 
 ### API com token (o `createApi` faz por você)
 
@@ -229,6 +231,6 @@ O jogo pode mandar `{ "t": "end", "result": { "winner" } }`, `{ "t": "save", "da
 | `GET /sdk/game` | qualquer um | `{ slug, name, status, currentVersion, token: "test" \| "publish", engine }` |
 | `POST /sdk/dev-rooms` | teste | Corpo `{ manifest, demo, audience: "sim" \| "none" }`. Abre (ou reabre) a sala de teste do jogo: `{ room, engine, game }`. Conecte em `/ws?room=<room>`. |
 | `POST /sdk/dev-rooms/<room>/test` | teste | Evento falso: `{ kind, text?, gift?, coins?, count?, user?, platform? }`. |
-| `GET` / `POST /sdk/dev-room/remote` | teste | Fase da sala de teste / toque da página de controle no teste (corpo igual ao `POST /remote/<chave>/send`). |
+| `GET` / `POST /sdk/dev-room/remote` | teste | Fase e `shared` da sala de teste / toque da página de controle no teste (corpo igual ao `POST /remote/<chave>/send`). |
 | `POST /sdk/builds` | publicação | `multipart/form-data` com `bundle` (o zip) e `notes`: envia uma versão. |
 | `GET /sdk/builds` | publicação | Versões enviadas: `[{ id, version, status, notes, reviewNotes, previewUrl, current, createdAt }]`. |

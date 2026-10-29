@@ -1,6 +1,6 @@
 {
   "name": "@gamelo/sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "SDK para criar jogos interativos de live (TikTok, Twitch, YouTube, Kick) na Gamelo.",
   "keywords": [
     "gamelo",
