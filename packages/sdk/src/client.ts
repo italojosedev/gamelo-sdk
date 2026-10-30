@@ -5,6 +5,7 @@ import type {
   Action,
   AudienceEvent,
   AudienceKind,
+  ControlEvent,
   DemoScript,
   GameEvent,
   GameManifest,
@@ -45,6 +46,8 @@ export interface Transport {
   start(receive: (msg: ServerMessage) => void): Promise<void>;
   send(msg: ClientMessage): void;
   test(e: TestEvent): Promise<void>;
+  /** Botão do streamer (controls do game.json), só na sala de teste. */
+  control(id: string, value?: string): Promise<void>;
   close(): void;
 }
 
@@ -100,9 +103,12 @@ export class Live {
     follow(opts?: Omit<TestEvent, 'kind'>): Promise<void>;
     share(opts?: Omit<TestEvent, 'kind'>): Promise<void>;
     join(opts?: Omit<TestEvent, 'kind'>): Promise<void>;
+    /** Aperta um botão do streamer (`controls` do game.json), como o "Controle ao vivo do jogo" do painel. */
+    control(id: string, value?: string): Promise<void>;
   };
   private readonly handlers = new Map<string, Set<Handler<any>>>();
   private readonly actionHandlers = new Map<string, Set<Handler<Action>>>();
+  private readonly controlHandlers = new Map<string, Set<Handler<ControlEvent>>>();
   private transport: Transport | null = null;
   private offset = 0;
   private synced = false;
@@ -129,6 +135,10 @@ export class Live {
       follow: (o) => send({ ...o, kind: 'follow' }),
       share: (o) => send({ ...o, kind: 'share' }),
       join: (o) => send({ ...o, kind: 'join' }),
+      control: async (id, value) => {
+        this.assertTest();
+        await this.transport!.control(id, value);
+      },
     };
   }
 
@@ -159,6 +169,14 @@ export class Live {
   onAction(name: string, fn: Handler<Action>): () => void {
     let set = this.actionHandlers.get(name);
     if (!set) this.actionHandlers.set(name, (set = new Set()));
+    set.add(fn);
+    return () => set.delete(fn);
+  }
+
+  /** Ouve um botão do streamer pelo `id` (o `controls` do game.json). */
+  onControl(id: string, fn: Handler<ControlEvent>): () => void {
+    let set = this.controlHandlers.get(id);
+    if (!set) this.controlHandlers.set(id, (set = new Set()));
     set.add(fn);
     return () => set.delete(fn);
   }
@@ -292,9 +310,13 @@ export class Live {
   }
 
   private async sendTest(e: TestEvent): Promise<void> {
+    this.assertTest();
+    await this.transport!.test(e);
+  }
+
+  private assertTest() {
     if (!this.transport) throw new Error('Chame live.start() antes');
     if (this.state.mode === 'room') throw new Error('[gamelo] Eventos de teste não valem na sala do streamer: use o "Testar" do painel.');
-    await this.transport.test(e);
   }
 
   private setStatus(s: Status) {
@@ -372,6 +394,19 @@ export class Live {
       case 'remote':
         if (typeof p?.name === 'string' && p.viewer) this.emit('remote', { name: p.name, data: p.data ?? null, platform: 'web', viewer: p.viewer } as RemoteInput);
         break;
+      case 'control': {
+        if (typeof p?.id !== 'string') break;
+        const control: ControlEvent = { id: p.id, value: typeof p.value === 'string' ? p.value : null };
+        this.emit('control', control);
+        for (const fn of this.controlHandlers.get(control.id) ?? []) {
+          try {
+            fn(control);
+          } catch (err) {
+            console.error(`[gamelo] erro no handler do botão "${control.id}"`, err);
+          }
+        }
+        break;
+      }
       case 'audience': {
         const ev = toAudience(p);
         if (!ev) break;
@@ -472,6 +507,9 @@ function socketTransport(engine: string, room: () => string, status: (s: Status)
     async test() {
       throw new Error('Eventos de teste não valem na sala do streamer.');
     },
+    async control() {
+      throw new Error('Na sala do streamer os botões ficam no painel (Controle ao vivo do jogo).');
+    },
     close() {
       closed = true;
       ws?.close();
@@ -495,6 +533,9 @@ function testTransport(api: GameloApi, manifest: GameManifest, demo: DemoScript,
     send: (msg) => socket.send(msg),
     async test(e) {
       await api.test(room, e);
+    },
+    async control(id, value) {
+      await api.control(room, id, value);
     },
     close: () => socket.close(),
   };

@@ -1,5 +1,6 @@
 // Painel de teste flutuante (sala de teste): manda comentários, presentes
-// e curtidas falsos para a sala, a partir das regras do game.json.
+// e curtidas falsos para a sala, a partir das regras do game.json, e aperta
+// os botões do streamer (controls).
 import type { Live } from './client.ts';
 
 const css = `
@@ -13,6 +14,7 @@ const css = `
 .lsdk .row{display:flex;flex-wrap:wrap;gap:4px}
 .lsdk button{all:unset;cursor:pointer;padding:4px 8px;border-radius:999px;background:#8c67f633;color:#d9ccff;font-size:11px}
 .lsdk button:hover{background:#8c67f666}
+.lsdk [data-control] button{background:#f5c54233;color:#ffe9a8}.lsdk [data-control] button:hover{background:#f5c54266}
 .lsdk form{display:flex;gap:4px}
 .lsdk input{flex:1;min-width:0;padding:4px 8px;border-radius:8px;border:1px solid #ffffff22;background:#0005;color:#fff;font:inherit}
 .lsdk small{color:#999}
@@ -57,6 +59,7 @@ export function mountDevtools(live: Live): void {
     <header><i></i>gamelo · ${live.state.mode}<span>${live.manifest?.name ?? ''}</span></header>
     <div class="b">
       <form><input placeholder="comentário" /><button>enviar</button></form>
+      <div class="row" data-control></div>
       <div class="row" data-chat></div>
       <div class="row" data-gift></div>
       <div class="row" data-misc></div>
@@ -69,6 +72,20 @@ export function mountDevtools(live: Live): void {
     b.onclick = () => run().catch((err) => console.error(err));
     root.querySelector(`[data-${where}]`)!.appendChild(b);
   };
+  // Botões do streamer (controls): os que têm campo perguntam o texto, já com o padrão do game.json.
+  for (const c of live.manifest?.controls ?? []) {
+    const field = c.input === true ? {} : c.input;
+    add('control', `🎛 ${c.label}`, async () => {
+      if (c.confirm && !confirm(c.confirm)) return;
+      let value: string | undefined;
+      if (field) {
+        const typed = prompt(c.label, field.value ?? '');
+        if (typed === null) return;
+        value = typed;
+      }
+      await live.test.control(c.id, value);
+    });
+  }
   for (const text of [...new Set(chats)]) add('chat', `💬 ${text}`, () => live.test.chat(text, { user: user() }));
   for (const g of gifts) add('gift', `🎁 ${g.name} (${g.coins})`, () => live.test.gift(g.name, { coins: g.coins, user: user() }));
   add('misc', '❤️ 10 curtidas', () => live.test.like(10, { user: user() }));

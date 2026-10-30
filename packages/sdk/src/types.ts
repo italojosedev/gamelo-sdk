@@ -151,6 +151,29 @@ export interface GameManifest {
     /** Texto padrão embaixo do QR (até 30 letras; o streamer pode trocar). */
     label?: string;
   };
+  /**
+   * Botões do streamer no painel ("Controle ao vivo do jogo"), até 12. Cada
+   * clique chega no jogo como `live.on('control')` / `live.onControl(id)`.
+   * Sem isto, a seção não aparece.
+   */
+  controls?: GameControl[];
+}
+
+/** Botão do streamer declarado no game.json (`controls`). */
+export interface GameControl {
+  /** Chega no jogo como `id` (letras, números, - ou _; até 40). */
+  id: string;
+  /** Texto do botão no painel (até 30 letras). */
+  label: string;
+  /** Explicação curta embaixo do botão (até 80 letras). */
+  hint?: string;
+  /**
+   * Campo de texto ao lado do botão; o que o streamer escrever chega em `value`.
+   * `true` = campo vazio e opcional. `value`: texto que já vem escrito; `max`: até quantas letras (padrão 80, até 200).
+   */
+  input?: true | { placeholder?: string; value?: string; required?: boolean; max?: number };
+  /** Pergunta antes de mandar (ex.: "Começar uma nova partida?"). */
+  confirm?: string;
 }
 
 /** Um evento da linha do tempo do demo.json. */
@@ -292,6 +315,14 @@ export interface RemoteInput {
   viewer: Viewer;
 }
 
+/** Botão do streamer apertado no painel ("Controle ao vivo do jogo"). */
+export interface ControlEvent {
+  /** O `id` do botão no game.json. */
+  id: string;
+  /** O texto do campo do botão (sem espaços nas pontas), ou null se o botão não tem campo ou ficou vazio. */
+  value: string | null;
+}
+
 export interface LiveEvents {
   /** Conectou (ou reconectou, ou a sala reabriu com ajustes novos). */
   ready: RoomState;
@@ -312,6 +343,8 @@ export interface LiveEvents {
   points: PointsUpdate;
   /** Comando da página de controle remoto (celular de um espectador). */
   remote: RemoteInput;
+  /** O streamer apertou um botão do "Controle ao vivo do jogo" (controls do game.json). */
+  control: ControlEvent;
   /** Os ajustes mudaram (o streamer salvou no painel). */
   settings: Record<string, unknown>;
   /** Todo GameEvent cru que chega do motor. */

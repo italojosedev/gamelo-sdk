@@ -152,6 +152,11 @@ export class GameloApi {
     await this.call('POST', `/sdk/dev-rooms/${encodeURIComponent(room)}/test`, event);
   }
 
+  /** Aperta um botão do streamer (`controls` do game.json) na sala de teste; chega no jogo como `control`. */
+  async control(room: string, id: string, value?: string): Promise<void> {
+    await this.call('POST', `/sdk/dev-rooms/${encodeURIComponent(room)}/control`, { id, ...(value !== undefined ? { value } : {}) });
+  }
+
   // ---- Pontos (qualquer sala, pela chave) ----
 
   /** Ranking de pontos da sala, do maior para o menor (até 100). */

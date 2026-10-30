@@ -2,6 +2,17 @@
 
 Todas as mudanças do `@gamelo/sdk`. O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e as versões seguem o [versionamento semântico](https://semver.org/lang/pt-BR/).
 
+## [0.4.0] - 2026-10-30
+
+### Adicionado
+
+- Botões do streamer: o `game.json` declara `controls` (`id`, `label`, `hint`, `input` com texto, `confirm`) e o streamer aperta no painel, na seção nova **Controle ao vivo do jogo** do Controle da sala (só aparece se o jogo declarar). Cada clique chega em todos os overlays da sala como o evento `control` (`{ id, value }`): `live.on('control')` ou `live.onControl(id, fn)`. Serve para comandos que antes iam por comentário de teste (ex.: `!votacao`, `!alerta texto` do Impostor) e que qualquer espectador poderia digitar. Na sala de teste: botões 🎛 no painel de teste, `live.test.control(id, texto?)` e `api.control(sala, id, texto?)`. Precisa da API com a rota `POST /sdk/dev-rooms/<sala>/control` e o evento `control`.
+- `game.schema.json` com `controls`.
+
+### Mudou
+
+- O painel só mostra a seção **Presentes** (e os botões de presente de cada plataforma no Testar) se o jogo tiver regra `"on": "gift"`.
+
 ## [0.3.0] - 2026-10-28
 
 ### Adicionado
