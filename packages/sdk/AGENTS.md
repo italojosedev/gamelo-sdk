@@ -41,6 +41,10 @@ Este projeto é um jogo de live feito com `@gamelo/sdk`. A página roda como fon
 
 Os pontos de cada espectador ficam no banco da Gamelo, por jogo e streamer, e somam entre lives. O streamer define as regras dele no painel (não vão no `game.json`); o jogo dá os pontos dele com `live.addPoints(acaoOuEvento, n)` (acerto, vitória) e lê os de alguém com `await live.viewerPoints(acaoOuEvento)` (ex.: comando "!pontos"). `live.on('points')` avisa quando alguém pontua e `live.ranking(n)` traz o ranking. Na sala de teste tudo isso fica na memória da API. Detalhes em `docs/EVENTS.md` > Pontuação.
 
+## Botões do streamer (opcional)
+
+Comando que só o streamer pode dar (abrir votação, revelar, mandar aviso) vai em `"controls"` no `game.json`, nunca numa regra de chat (qualquer espectador digitaria): `{ "id": "votacao", "label": "Abrir votação" }`, com `"input"` para mandar um texto junto (`{ "value": "Observem os olhares!", "required": true }`) e `"confirm"` para botões que apagam algo. O streamer aperta no painel (Controle ao vivo do jogo) e o jogo recebe em `live.onControl('votacao', ({ value }) => …)`. No dev, botões 🎛 no painel de teste. Contrato em `docs/EVENTS.md` > Controle ao vivo do jogo.
+
 ## Controle remoto (opcional)
 
 Só existe se o `game.json` tiver `"remote": { "page": "controle.html" }` e a página estiver no build. A página usa `createRemote()` (token de teste só no dev; na live a chave vem do QR) e manda `remote.send(nome, dados)`, que o jogo recebe em `live.on('remote')`. No sentido contrário, `live.shareRemote(dados)` (JSON até 2 KB) aparece na página em `remote.state.shared`. Nunca ponha o token no build. Contrato em `docs/EVENTS.md` > Controle remoto.

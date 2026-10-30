@@ -115,6 +115,7 @@ O motor controla a rodada, igual para todos os overlays: `lobby` → `countdown`
 | --- | --- |
 | `ready` | Conectou, reconectou ou a sala reabriu (o streamer salvou ajustes). Traz o `RoomState`. |
 | `settings` | Os ajustes mudaram. Releia `live.settings`. |
+| `control` | O streamer apertou um botão do **Controle ao vivo do jogo**: `{ id, value }`. Veja a seção dos botões. |
 | `status` | `connecting`, `online` ou `offline`. O SDK reconecta sozinho. |
 | `live.settings` | `settings` do game.json com o que o streamer mudou no painel. |
 | `live.save(dados)` / `live.state.saved` | Estado pequeno (até ~60 KB) guardado na sala para o jogo continuar se o overlay recarregar. Some quando a sala fecha (2 min sem overlay e sem transmissão conectada). |
@@ -179,6 +180,45 @@ Na página de controle, `createRemote()`:
 
 Do jogo para os celulares: `live.shareRemote(dados)` guarda na sala um estado pequeno (JSON de até 2 KB; vale o último, `null` limpa) que as páginas de controle leem em `remote.state.shared` junto com a fase, a cada `pollMs` (padrão 3 s, mínimo 1 s). Serve para a página mostrar o que importa do jogo, por exemplo as letras já testadas para pintar o teclado. O SDK só manda quando muda e manda de novo quando a sala reconecta. Limite por aparelho: 1 toque a cada 100 ms e 50 a cada 10 s. Presentes não passam pelo controle.
 
+## Controle ao vivo do jogo (botões do streamer)
+
+Comandos que só o streamer pode dar (abrir uma votação, revelar o resultado, mandar um aviso na tela) não devem vir do chat: qualquer pessoa digitaria. O jogo declara **botões** no `game.json` e o streamer aperta no painel, na seção **Controle ao vivo do jogo** do Controle da sala (também na janela da prévia e no teste do admin). A seção só aparece se o jogo declarar `controls`.
+
+```json
+"controls": [
+  { "id": "votacao", "label": "Abrir votação", "hint": "Começa os 60 s de voto" },
+  { "id": "acertou", "label": "Acertou", "input": { "placeholder": "nº do suspeito (opcional)", "max": 2 } },
+  { "id": "novapartida", "label": "Nova partida", "confirm": "Começar uma nova partida? O placar zera." },
+  { "id": "alerta", "label": "Mandar alerta", "input": { "value": "Observem os olhares!", "required": true, "max": 60 } }
+]
+```
+
+| Campo | O que faz |
+| --- | --- |
+| `id` | Chega no jogo. Letras, números, `-` ou `_`, até 40, sem repetir. |
+| `label` | Texto do botão (até 30 letras). |
+| `hint` | Explicação curta embaixo do botão (até 80). |
+| `input` | Campo de texto ao lado do botão; o texto chega em `value`. `true` = campo vazio e opcional. Objeto: `placeholder` (até 40), `value` (texto que já vem escrito; o streamer pode trocar), `required` (só manda com texto), `max` (letras, padrão 80, até 200). |
+| `confirm` | Pergunta antes de mandar (até 80), para botões que apagam alguma coisa. |
+
+Até 12 botões. Cada clique chega em **todos os overlays da sala** (OBS e prévia) como:
+
+| Evento | Payload |
+| --- | --- |
+| `control` | `{ id, value }`. `value` é o texto do campo sem espaços nas pontas, ou `null` (botão sem campo ou campo vazio). |
+
+```ts
+live.onControl('votacao', () => abrirVotacao());
+live.onControl('alerta', ({ value }) => mostrarAviso(value!));
+live.on('control', ({ id, value }) => console.log(id, value)); // todos os botões
+```
+
+O botão não passa pelas regras do `game.json` nem pela pontuação e não tem espectador. A sala precisa estar aberta (overlay no OBS ou a prévia). No desenvolvimento, os botões aparecem no painel de teste (🎛) e `live.test.control('alerta', 'texto')` aperta pelo console.
+
+### Presentes no painel
+
+A seção **Presentes** do Controle da sala (nomes dos presentes, faixas de moedas) só aparece se o `game.json` tiver alguma regra `"on": "gift"`. Jogo sem regra de presente não mostra a seção nem os botões de presente de cada plataforma no **Testar**.
+
 ## demo.json (obrigatório)
 
 Todo zip de jogo precisa de um `demo.json` na raiz, ao lado do `game.json`. É o público de mentira do jogo: uma linha do tempo de eventos que roda em loop na **prévia do build**, na **demonstração da loja**, na **revisão do admin** e na **sala de teste**. Os presentes dele também viram os botões de teste do painel. Um zip sem `demo.json` válido é recusado com a mensagem do erro.
@@ -217,6 +257,7 @@ WebSocket em `<engine>/ws?room=<chave>`. O servidor manda JSON:
 
 - `{ "t": "hello", "room", "game", "info": { "settings", "round", "source", "saved", "remote" } }` (`remote` só com o controle remoto ligado)
 - `remote` em `events`: comando da página de controle, payload `{ name, data, platform: "web", viewer }`, `seq` 0
+- `control` em `events`: botão do streamer (`controls` do game.json), payload `{ id, value }`, `seq` 0
 - `{ "t": "snapshot", "state": { "now", "phase", "phaseEndsAt", "round", "seq" }, "seq" }` (a cada mudança e pelo menos 1 vez por segundo)
 - `{ "t": "events", "events": [{ "seq", "at", "type", "payload" }] }` com `type` = `audience`, `action`, `phase`, `round.end`, `points` (payload `{ updates: [{ platform, viewer, added, total }] }`, `seq` 0)
 
@@ -231,6 +272,7 @@ O jogo pode mandar `{ "t": "end", "result": { "winner" } }`, `{ "t": "save", "da
 | `GET /sdk/game` | qualquer um | `{ slug, name, status, currentVersion, token: "test" \| "publish", engine }` |
 | `POST /sdk/dev-rooms` | teste | Corpo `{ manifest, demo, audience: "sim" \| "none" }`. Abre (ou reabre) a sala de teste do jogo: `{ room, engine, game }`. Conecte em `/ws?room=<room>`. |
 | `POST /sdk/dev-rooms/<room>/test` | teste | Evento falso: `{ kind, text?, gift?, coins?, count?, user?, platform? }`. |
+| `POST /sdk/dev-rooms/<room>/control` | teste | Botão do streamer: `{ id, value? }` (o `id` de um dos `controls` do game.json). |
 | `GET` / `POST /sdk/dev-room/remote` | teste | Fase e `shared` da sala de teste / toque da página de controle no teste (corpo igual ao `POST /remote/<chave>/send`). |
 | `POST /sdk/builds` | publicação | `multipart/form-data` com `bundle` (o zip) e `notes`: envia uma versão. |
 | `GET /sdk/builds` | publicação | Versões enviadas: `[{ id, version, status, notes, reviewNotes, previewUrl, current, createdAt }]`. |

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createApi, createLive, createRemote, type Action, type Live, type RemoteInput } from './index.ts';
+import { createApi, createLive, createRemote, type Action, type ControlEvent, type Live, type RemoteInput } from './index.ts';
 
 const manifest = {
   id: 'corrida',
@@ -197,6 +197,35 @@ describe('protocolo da sala', () => {
     live.receive({ t: 'events', events: [{ seq: 1, at: 0, type: 'audience', payload: { id: 'l', kind: 'like', platform: 'tiktok', at: 0, viewer: { id: 'v', handle: 'v', nickname: 'v' }, count: 15 } }] });
     expect(got).toEqual(['15']);
     expect(err).toHaveBeenCalled();
+  });
+});
+
+describe('botões do streamer (controls)', () => {
+  it('chegam em live.on("control") e em live.onControl(id), com o texto do campo', () => {
+    live = createLive({ manifest, demo, mode: 'room', room: 'sala' });
+    const all: ControlEvent[] = [];
+    const alerts: (string | null)[] = [];
+    live.on('control', (c) => all.push(c));
+    live.onControl('alerta', (c) => alerts.push(c.value));
+    live.receive({
+      t: 'events',
+      events: [
+        { seq: 0, at: 1, type: 'control', payload: { id: 'votacao', value: null } },
+        { seq: 0, at: 2, type: 'control', payload: { id: 'alerta', value: 'Observem os olhares!' } },
+        { seq: 0, at: 3, type: 'control', payload: { value: 'sem id' } },
+      ],
+    });
+    expect(all).toEqual([
+      { id: 'votacao', value: null },
+      { id: 'alerta', value: 'Observem os olhares!' },
+    ]);
+    expect(alerts).toEqual(['Observem os olhares!']);
+  });
+
+  it('live.test.control só vale na sala de teste', async () => {
+    live = createLive({ manifest, demo, mode: 'room', room: 'sala' });
+    (live as any).transport = { send() {}, close() {}, control: async () => {} };
+    await expect(live.test.control('votacao')).rejects.toThrow(/sala do streamer/);
   });
 });
 

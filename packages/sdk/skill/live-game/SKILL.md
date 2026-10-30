@@ -50,9 +50,18 @@ await live.start();
 - `like`, `share`, `join` só no TikTok. Twitch/YouTube/Kick mandam apoio pago como `gift` ("Bits", "Sub", "Super Chat", "Membro", Kicks) na escala de moedas do TikTok.
 - Nunca coloque token no código que vai para o build (teste só com `import.meta.env.DEV`; o de publicação é `GAMELO_PUBLISH_TOKEN`, sem `VITE_`). Nunca dê valor em dinheiro a presentes.
 - Não existe modo sem servidor: o SDK não traz o motor. Para chamar a API (sala de teste, pontos, versões) use `createLive`, `createRemote` ou `createApi`, nunca `fetch` na mão.
+- Comando do streamer é botão (`controls` + `live.onControl`), não comentário: regra de chat qualquer espectador dispara.
 - Overlay transparente em 9:16; deixe topo (~12%) e base (~25%) livres; limite listas e elementos para aguentar horas.
 - `live.endRound()` só funciona em `playing`; `live.save()` aceita até ~60 KB.
 - Regras de pontuação são do streamer (painel > Pontuação), não do game.json. O jogo pode dar os pontos dele com `live.addPoints(a, 60)` (passe a ação/evento de quem ganhou; o id do evento evita somar em dobro) e ler os de alguém com `await live.viewerPoints(a)` → `{ points, rank }` (comando "!pontos"). Mostre com `live.on('points')` e `await live.ranking(5)`. Na sala de teste os pontos ficam na memória da API.
+
+## Botões do streamer (opcional)
+
+Para comandos que só o streamer dá (abrir votação, encerrar, revelar, nova partida, aviso na tela), nunca use regra de chat:
+
+1. `public/game.json`: `"controls": [{ "id": "votacao", "label": "Abrir votação" }, { "id": "alerta", "label": "Mandar alerta", "input": { "value": "Observem os olhares!", "required": true } }, { "id": "novapartida", "label": "Nova partida", "confirm": "Começar outra partida?" }]` (até 12; `label` até 30 letras; `input: true` = texto opcional).
+2. No jogo: `live.onControl('votacao', () => ...)`, `live.onControl('alerta', ({ value }) => ...)` (`value` é string ou null).
+3. Testar: botões 🎛 no painel de teste ou `live.test.control('alerta', 'texto')`. Na live ficam em Controle da sala > Controle ao vivo do jogo. Detalhes em `docs/EVENTS.md` > Controle ao vivo do jogo.
 
 ## Controle remoto (opcional)
 

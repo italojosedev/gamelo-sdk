@@ -66,8 +66,9 @@ Ou `npm run pack` e envie o `game.zip` em **Versões (builds)** no painel. O zip
 | --- | --- |
 | `createLive(options)` | `mode`, `token` (de teste), `engine`, `room`, `manifest` (padrão: `./game.json`), `demo` (padrão: `./demo.json`), `audience` (`sim` repete o demo, `none`), `devtools`, `remoteQr`. |
 | `live.start()` | Conecta; resolve com o estado da sala. |
-| `live.on(evento, fn)` | `chat`, `gift`, `like`, `follow`, `share`, `join`, `audience`, `action`, `phase`, `round.end`, `ready`, `settings`, `status`, `event`. Devolve a função para parar de ouvir. |
+| `live.on(evento, fn)` | `chat`, `gift`, `like`, `follow`, `share`, `join`, `audience`, `action`, `control`, `remote`, `points`, `phase`, `round.end`, `ready`, `settings`, `status`, `event`. Devolve a função para parar de ouvir. |
 | `live.onAction(nome, fn)` | Ação de uma regra do game.json. |
+| `live.onControl(id, fn)` | Botão do streamer (`controls` do game.json, seção Controle ao vivo do jogo no painel): `{ id, value }`. |
 | `live.state` | `mode`, `status`, `phase`, `round`, `phaseEndsAt`, `settings`, `source`, `saved`. |
 | `live.settings` | Ajustes da sala. |
 | `live.now()` / `live.timeLeft()` | Hora do servidor e tempo da fase. |
@@ -75,6 +76,7 @@ Ou `npm run pack` e envie o `game.zip` em **Versões (builds)** no painel. O zip
 | `live.save(dados)` | Guarda um estado pequeno para recarregar o overlay sem perder o jogo. |
 | `live.avatar(url)` | Foto de perfil pelo proxy da Gamelo. |
 | `live.test.chat/gift/like/follow/share/join` | Eventos falsos (sala de teste). |
+| `live.test.control(id, texto?)` | Aperta um botão do streamer (sala de teste). |
 | `live.addPoints` / `live.viewerPoints` / `live.ranking` | Pontos dos espectadores (na sala de teste ficam na memória da API). |
 | `createRemote(options)` | Página de controle remoto (QR code). |
 
@@ -87,6 +89,7 @@ Ou `npm run pack` e envie o `game.zip` em **Versões (builds)** no painel. O zip
 | `api.game()` | qualquer um | O jogo do token e o tipo do token. |
 | `api.openTestRoom({ manifest, demo, audience })` | teste | Abre (ou reabre) a sala de teste; devolve a chave da sala. |
 | `api.test(sala, evento)` | teste | Comentário, presente, curtida… falsos na sala de teste. |
+| `api.control(sala, id, texto?)` | teste | Botão do streamer (`controls`) na sala de teste. |
 | `api.ranking(sala, n)` / `api.viewerPoints(sala, plataforma, id)` | nenhum | Pontos da sala pela chave. |
 | `api.uploadBuild(zip, notas)` | publicação | Envia uma versão nova. |
 | `api.builds()` | publicação | Versões enviadas, com a revisão e qual é a atual. |

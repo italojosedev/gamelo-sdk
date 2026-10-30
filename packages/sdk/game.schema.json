@@ -71,6 +71,38 @@
       "required": ["page"],
       "additionalProperties": false
     },
+    "controls": {
+      "type": "array",
+      "maxItems": 12,
+      "description": "Botões do streamer no painel (Controle ao vivo do jogo). Cada clique chega no jogo em live.on('control') / live.onControl(id). Sem isto, a seção não aparece.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "pattern": "^[\\w-]{1,40}$", "description": "Chega no jogo como id." },
+          "label": { "type": "string", "minLength": 1, "maxLength": 30, "description": "Texto do botão." },
+          "hint": { "type": "string", "maxLength": 80, "description": "Explicação curta embaixo do botão." },
+          "input": {
+            "description": "Campo de texto ao lado do botão; o texto chega em value. true = campo vazio e opcional.",
+            "oneOf": [
+              { "const": true },
+              {
+                "type": "object",
+                "properties": {
+                  "placeholder": { "type": "string", "maxLength": 40 },
+                  "value": { "type": "string", "description": "Texto que já vem escrito." },
+                  "required": { "type": "boolean", "description": "true: o botão só manda com texto." },
+                  "max": { "type": "integer", "minimum": 1, "maximum": 200, "description": "Até quantas letras (padrão 80)." }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "confirm": { "type": "string", "maxLength": 80, "description": "Pergunta antes de mandar." }
+        },
+        "required": ["id", "label"],
+        "additionalProperties": false
+      }
+    },
     "settings": {
       "type": "object",
       "description": "Números e textos ajustáveis pelo streamer no painel."
