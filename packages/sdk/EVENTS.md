@@ -5,7 +5,7 @@ Tudo que um jogo do `@gamelo/sdk` recebe. O motor da Gamelo (no servidor) conect
 O jogo sempre roda numa sala no servidor: a **sala do streamer** na live (e a de prévia, na prévia do build e na demonstração da loja), aberta pelo link com `?room=`, ou a **sala de teste** no desenvolvimento, aberta com o **token de teste** do jogo (`lgt_...`) e o `game.json` e o `demo.json` locais. Os eventos e o protocolo são os mesmos nas duas.
 
 ```
-live (TikTok/Twitch/YouTube/Kick) ─► conector ─► gateway ─► regras do game.json ─► WebSocket ─► seu jogo (navegador/OBS)
+live (TikTok/Twitch/YouTube/Kick/Instagram) ─► conector ─► gateway ─► regras do game.json ─► WebSocket ─► seu jogo (navegador/OBS)
                                                               (rodada e cronômetro)        ◄── endRound / save
 ```
 
@@ -17,8 +17,8 @@ Todos têm a mesma base:
 | --- | --- | --- |
 | `kind` | `chat` \| `gift` \| `like` \| `follow` \| `share` \| `join` | Tipo do evento. |
 | `id` | string | Único. Duplicados já foram removidos. |
-| `platform` | `tiktok` \| `twitch` \| `youtube` \| `kick` \| `web` \| `sim` | De onde veio. `web` = controle remoto pelo celular (QR code). `sim` = público simulado ou botão de teste. |
-| `viewer.id` | string | Id estável da pessoa na plataforma (Twitch `tw:`, YouTube `yt:`, Kick `kk:`). Use como chave de jogador. |
+| `platform` | `tiktok` \| `twitch` \| `youtube` \| `kick` \| `instagram` \| `web` \| `sim` | De onde veio. `web` = controle remoto pelo celular (QR code). `sim` = público simulado ou botão de teste. |
+| `viewer.id` | string | Id estável da pessoa na plataforma (Twitch `tw:`, YouTube `yt:`, Kick `kk:`, Instagram `ig:`). Use como chave de jogador. |
 | `viewer.handle` | string | O @ sem "@". Para mostrar na tela. |
 | `viewer.nickname` | string | Nome de exibição. |
 | `viewer.avatarUrl` | string? | Foto. Carregue com `live.avatar(url)` (proxy do motor; o OBS bloqueia a original por CORS). |
@@ -45,16 +45,16 @@ O TikTok reenvia o mesmo presente com a contagem acumulada enquanto a pessoa seg
 
 ## O que cada plataforma manda
 
-| Evento | TikTok | Twitch | YouTube Live | Kick |
-| --- | --- | --- | --- | --- |
-| `chat` | comentário | mensagem do chat | mensagem do chat | mensagem do chat |
-| `gift` | presentes (nome e id reais, `coins` = diamantes) | Bits (`giftName` "Bits", 1 moeda por bit); sub "Sub" / "Sub nível 2" / "Sub nível 3" (499 / 999 / 2499); "Sub de presente" (`count` = quantos); "Resub" | "Super Chat" e "Super Sticker" (valor convertido para centavos de dólar); "Membro" (499); "Membros de presente" (`count` = quantos); "Membro (renovação)" | "Sub" e "Resub" (499); "Sub de presente" (`count` = quantos); Kicks (nome do Kick, 1 moeda por Kick) |
-| `like` | sim (em lotes) | — | — | — |
-| `follow` | sim | sim | — | sim |
-| `share` | sim | — | — | — |
-| `join` | sim | — | — | — |
+| Evento | TikTok | Twitch | YouTube Live | Kick | Instagram |
+| --- | --- | --- | --- | --- | --- |
+| `chat` | comentário | mensagem do chat | mensagem do chat | mensagem do chat | comentário da live |
+| `gift` | presentes (nome e id reais, `coins` = diamantes) | Bits (`giftName` "Bits", 1 moeda por bit); sub "Sub" / "Sub nível 2" / "Sub nível 3" (499 / 999 / 2499); "Sub de presente" (`count` = quantos); "Resub" | "Super Chat" e "Super Sticker" (valor convertido para centavos de dólar); "Membro" (499); "Membros de presente" (`count` = quantos); "Membro (renovação)" | "Sub" e "Resub" (499); "Sub de presente" (`count` = quantos); Kicks (nome do Kick, 1 moeda por Kick) | — |
+| `like` | sim (em lotes) | — | — | — | — |
+| `follow` | sim | sim | — | sim | — |
+| `share` | sim | — | — | — | — |
+| `join` | sim | — | — | — | — |
 
-Na Twitch, no YouTube e na Kick o `giftId` é igual ao `giftName` (exceto Kicks, que trazem o tipo). Um jogo que depende de `like`, `share` ou `join` precisa de outra forma de jogar nas outras plataformas: prefira mecânicas de `chat` e `gift`, que existem em todas.
+Na Twitch, no YouTube e na Kick o `giftId` é igual ao `giftName` (exceto Kicks, que trazem o tipo). Um jogo que depende de `like`, `share` ou `join` precisa de outra forma de jogar nas outras plataformas: prefira mecânicas de `chat` e `gift`. No Instagram só chega `chat` (a API da Meta não entrega presentes nem selos): um jogo que só anda com `gift` não funciona lá.
 
 ## Ações (regras do game.json)
 
@@ -119,7 +119,7 @@ O motor controla a rodada, igual para todos os overlays: `lobby` → `countdown`
 | `status` | `connecting`, `online` ou `offline`. O SDK reconecta sozinho. |
 | `live.settings` | `settings` do game.json com o que o streamer mudou no painel. |
 | `live.save(dados)` / `live.state.saved` | Estado pequeno (até ~60 KB) guardado na sala para o jogo continuar se o overlay recarregar. Some quando a sala fecha (2 min sem overlay e sem transmissão conectada). |
-| `live.state.source` | `tiktok`, `twitch`, `youtube`, `kick`, `simulator` ou `nenhuma`. |
+| `live.state.source` | `tiktok`, `twitch`, `youtube`, `kick`, `instagram`, `simulator` ou `nenhuma`. |
 | `event` | Todo GameEvent cru (`{ seq, at, type, payload }`), para depurar. |
 
 ## Pontuação dos espectadores

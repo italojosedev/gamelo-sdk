@@ -23,7 +23,7 @@ export interface TestEvent {
   coins?: number;
   count?: number;
   user?: string;
-  platform?: 'tiktok' | 'twitch' | 'youtube' | 'kick' | 'web';
+  platform?: 'tiktok' | 'twitch' | 'youtube' | 'kick' | 'instagram' | 'web';
 }
 
 export interface ApiOptions {
