@@ -3,7 +3,7 @@
 
 /** De onde veio o evento. `sim` é o público simulado (desenvolvimento e testes). */
 /** web: controle remoto pelo celular do espectador (QR code na tela). */
-export type Platform = 'tiktok' | 'twitch' | 'youtube' | 'kick' | 'web' | 'sim';
+export type Platform = 'tiktok' | 'twitch' | 'youtube' | 'kick' | 'instagram' | 'web' | 'sim';
 
 /** Quem fez algo na live. */
 export interface Viewer {
@@ -183,7 +183,7 @@ export interface DemoEvent {
   kind: AudienceKind;
   /** @ de quem fez (um dos `viewers` ou qualquer nome). Sem ele, os viewers se revezam. */
   user?: string;
-  platform?: 'tiktok' | 'twitch' | 'youtube' | 'kick';
+  platform?: 'tiktok' | 'twitch' | 'youtube' | 'kick' | 'instagram';
   /** chat: o comentário. */
   text?: string;
   /** gift: nome do presente. */
@@ -258,7 +258,7 @@ export interface RoomState {
   phaseEndsAt: number;
   /** Ajustes valendo (game.json + o que o streamer mudou). */
   settings: Record<string, unknown>;
-  /** De onde vem a audiência: tiktok, twitch, youtube, kick, simulator ou nenhuma. */
+  /** De onde vem a audiência: tiktok, twitch, youtube, kick, instagram, simulator ou nenhuma. */
   source: string;
   /** O último `live.save()` desta sala (sobrevive a recarregar o overlay). */
   saved: unknown;

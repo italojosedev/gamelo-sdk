@@ -2,6 +2,12 @@
 
 Todas as mudanças do `@gamelo/sdk`. O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e as versões seguem o [versionamento semântico](https://semver.org/lang/pt-BR/).
 
+## [0.5.0] - 2026-11-03
+
+### Adicionado
+
+- Plataforma `instagram`: comentários de live do Instagram chegam como `chat` (`platform: 'instagram'`, `viewer.id` com `ig:`). O Instagram não manda `gift`, `like`, `follow`, `share` nem `join`. `live.state.source` pode ser `instagram`, e os testes aceitam `platform: 'instagram'`. Precisa da API com o Instagram (live-engine #85).
+
 ## [0.4.0] - 2026-10-30
 
 ### Adicionado

@@ -6,7 +6,7 @@
 </p>
 
 <p align="center"><b>SDK para criar jogos interativos de live na Gamelo.</b><br>
-TikTok, Twitch, YouTube Live e Kick: o público joga pelos comentários e presentes.</p>
+TikTok, Twitch, YouTube Live, Kick e Instagram: o público joga pelos comentários e presentes.</p>
 
 ---
 

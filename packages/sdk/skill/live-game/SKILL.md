@@ -1,6 +1,6 @@
 ---
 name: live-game
-description: Cria ou altera jogos interativos de live (TikTok, Twitch, YouTube, Kick) com o @gamelo/sdk — mecânicas a partir de comentários e presentes, game.json, overlay 9:16 e envio de build. Use ao criar um jogo de live, adicionar uma mecânica de presente/comentário ou depurar eventos da live.
+description: Cria ou altera jogos interativos de live (TikTok, Twitch, YouTube, Kick, Instagram) com o @gamelo/sdk — mecânicas a partir de comentários e presentes, game.json, overlay 9:16 e envio de build. Use ao criar um jogo de live, adicionar uma mecânica de presente/comentário ou depurar eventos da live.
 ---
 
 # Jogo de live com @gamelo/sdk
@@ -47,6 +47,7 @@ await live.start();
 - Não use `Date.now()` para tempo de jogo: `live.now()` / `live.timeLeft()`.
 - `gift.count` é o incremento deste evento (combos já tratados), não o total da sequência.
 - O mesmo comentário chega como `chat` e como ação: não aplique a regra nos dois.
+- No Instagram só chega `chat` (sem presentes); o jogo tem que andar só com comentários.
 - `like`, `share`, `join` só no TikTok. Twitch/YouTube/Kick mandam apoio pago como `gift` ("Bits", "Sub", "Super Chat", "Membro", Kicks) na escala de moedas do TikTok.
 - Nunca coloque token no código que vai para o build (teste só com `import.meta.env.DEV`; o de publicação é `GAMELO_PUBLISH_TOKEN`, sem `VITE_`). Nunca dê valor em dinheiro a presentes.
 - Não existe modo sem servidor: o SDK não traz o motor. Para chamar a API (sala de teste, pontos, versões) use `createLive`, `createRemote` ou `createApi`, nunca `fetch` na mão.
